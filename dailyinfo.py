@@ -123,14 +123,13 @@ class DataFetcher:
             
             # 크롤링 실패 시 Mock 데이터 반환
             if not chart_data:
-                st.warning("벅스 차트 크롤링에 실패했습니다. Mock 데이터를 사용합니다.")
+                st.error("데이터 불러오기에 실패하였습니다. 잠시 후에 다시 시도하세요.")
                 return DataFetcher._get_mock_bugs_chart()
             
             return chart_data
             
         except Exception as e:
-            st.error(f"벅스 차트 데이터 수집 실패: {e}")
-            st.info("Mock 데이터를 사용합니다.")
+            st.error("데이터 불러오기에 실패하였습니다. 잠시 후에 다시 시도하세요.")
             return DataFetcher._get_mock_bugs_chart()
     
     @staticmethod
