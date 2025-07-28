@@ -578,9 +578,6 @@ class PageHandlers:
         """날씨 정보 페이지"""
         st.header("🌤️ 날씨 정보")
         
-        # 데이터 출처 정보
-        st.info("📡 OpenWeatherMap API를 통해 실시간 날씨 정보를 제공합니다.")
-        
         # 도시 선택
         col1, col2 = st.columns([1, 3])
         with col1:
