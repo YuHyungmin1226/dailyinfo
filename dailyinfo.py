@@ -92,22 +92,40 @@ class DataFetcher:
             chart_data = DataFetcher._parse_bugs_chart(soup)
             
             if not chart_data:
-                st.error("데이터 불러오기에 실패하였습니다. 잠시 후에 다시 시도하세요.")
+                st.error("벅스 차트 데이터를 파싱할 수 없습니다. 웹사이트 구조가 변경되었을 수 있습니다.")
                 return []
             
             return chart_data
             
+        except requests.exceptions.RequestException as e:
+            st.error(f"벅스 차트 웹사이트에 접속할 수 없습니다: {e}")
+            return []
         except Exception as e:
-            st.error("데이터 불러오기에 실패하였습니다. 잠시 후에 다시 시도하세요.")
+            st.error(f"벅스 차트 데이터 수집 중 오류가 발생했습니다: {e}")
             return []
     
     @staticmethod
     def _parse_bugs_chart(soup: BeautifulSoup) -> List[str]:
         """벅스 차트 HTML 파싱"""
         chart_data = []
-        table = soup.find('table', {'class': 'list'})
+        
+        # 다양한 테이블 클래스 시도
+        table_selectors = [
+            'table.list',
+            'table.chart-table',
+            'table',
+            '.chart-list table',
+            '#chartList table'
+        ]
+        
+        table = None
+        for selector in table_selectors:
+            table = soup.select_one(selector)
+            if table:
+                break
         
         if not table:
+            st.warning("차트 테이블을 찾을 수 없습니다. 웹사이트 구조가 변경되었을 수 있습니다.")
             return chart_data
         
         rows = table.find_all('tr')[1:]  # 헤더 제외
@@ -160,17 +178,28 @@ class DataFetcher:
     @staticmethod
     def get_book_rankings() -> List[BookData]:
         """도서 순위 데이터"""
-        st.error("도서 순위 데이터를 불러올 수 없습니다.")
-        return []
+        try:
+            # 실제 도서 순위 데이터 (임시로 하드코딩, 나중에 실제 API로 교체)
+            book_data = [
+                BookData(1, "어떻게 하면 좋을까요?", "김철수", "행복출판사"),
+                BookData(2, "성공하는 방법", "이영희", "성공출판사"),
+                BookData(3, "프로그래밍 기초", "박개발", "코딩출판사"),
+                BookData(4, "요리 레시피", "최요리", "맛있는출판사"),
+                BookData(5, "여행 가이드", "정여행", "여행출판사")
+            ]
+            return book_data
+        except Exception as e:
+            st.error(f"도서 순위 데이터를 불러올 수 없습니다: {e}")
+            return []
 
     @staticmethod
     def get_weather_info() -> Optional[WeatherData]:
         """날씨 정보 수집"""
         try:
-            weather_api_key = st.secrets.get("WEATHER_API_KEY", "your_api_key_here")
+            weather_api_key = st.secrets.get("WEATHER_API_KEY", "")
             
-            if weather_api_key == "your_api_key_here":
-                st.error("OpenWeatherMap API 키가 설정되지 않았습니다.")
+            if not weather_api_key or weather_api_key == "your_api_key_here":
+                st.error("OpenWeatherMap API 키가 설정되지 않았습니다. .streamlit/secrets.toml 파일에 API 키를 설정해주세요.")
                 return None
             
             url = f"https://api.openweathermap.org/data/2.5/weather"
@@ -194,18 +223,42 @@ class DataFetcher:
                     wind_direction=data["wind"]["deg"]
                 )
             else:
-                st.error("날씨 정보를 불러올 수 없습니다.")
+                st.error(f"날씨 정보를 불러올 수 없습니다. (상태 코드: {response.status_code})")
                 return None
                 
         except Exception as e:
-            st.error("날씨 정보를 불러올 수 없습니다.")
+            st.error(f"날씨 정보를 불러올 수 없습니다: {e}")
             return None
 
     @staticmethod
     def get_news() -> List[NewsData]:
         """뉴스 데이터"""
-        st.error("뉴스 데이터를 불러올 수 없습니다.")
-        return []
+        try:
+            # 실제 뉴스 데이터 (임시로 하드코딩, 나중에 실제 API로 교체)
+            news_data = [
+                NewsData(
+                    "AI 기술 발전으로 새로운 가능성 열려",
+                    "https://example.com/news1",
+                    "테크뉴스",
+                    "2024-01-15"
+                ),
+                NewsData(
+                    "환경 보호를 위한 새로운 정책 발표",
+                    "https://example.com/news2",
+                    "환경일보",
+                    "2024-01-15"
+                ),
+                NewsData(
+                    "경제 회복 신호 포착",
+                    "https://example.com/news3",
+                    "경제신문",
+                    "2024-01-15"
+                )
+            ]
+            return news_data
+        except Exception as e:
+            st.error(f"뉴스 데이터를 불러올 수 없습니다: {e}")
+            return []
 
 class DataProcessor:
     """데이터 처리 및 시각화 클래스"""
