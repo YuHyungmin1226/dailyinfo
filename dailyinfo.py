@@ -877,8 +877,7 @@ class PageHandlers:
                                         table_data.append({
                                             "교시": f"{item.period}교시",
                                             "과목": item.subject,
-                                            "담당교사": item.teacher if item.teacher else "-",
-                                            "교실": item.classroom if item.classroom else "-"
+                                            "담당교사": item.teacher if item.teacher else "-"
                                         })
                                     
                                     # Streamlit 테이블로 표시
@@ -891,8 +890,7 @@ class PageHandlers:
                                             column_config={
                                                 "교시": st.column_config.TextColumn("교시", width="medium"),
                                                 "과목": st.column_config.TextColumn("과목", width="large"),
-                                                "담당교사": st.column_config.TextColumn("담당교사", width="medium"),
-                                                "교실": st.column_config.TextColumn("교실", width="medium")
+                                                "담당교사": st.column_config.TextColumn("담당교사", width="medium")
                                             }
                                         )
                                     else:
