@@ -28,6 +28,35 @@ class Constants:
     
     # URL
     GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko"
+    NEIS_BASE_URL = "https://open.neis.go.kr/hub"
+    
+    # NEIS API 엔드포인트
+    NEIS_SCHOOL_INFO = f"{NEIS_BASE_URL}/schoolInfo"
+    NEIS_MEAL_INFO = f"{NEIS_BASE_URL}/mealServiceDietInfo"
+    NEIS_HIS_TIMETABLE = f"{NEIS_BASE_URL}/hisTimetable"  # 고등학교
+    NEIS_MIS_TIMETABLE = f"{NEIS_BASE_URL}/misTimetable"  # 중학교
+    NEIS_ELS_TIMETABLE = f"{NEIS_BASE_URL}/elsTimetable"  # 초등학교
+    
+    # 지역 정보 (교육청 코드)
+    REGIONS = {
+        "서울특별시": "B10",
+        "부산광역시": "C10",
+        "대구광역시": "D10",
+        "인천광역시": "E10",
+        "광주광역시": "F10",
+        "대전광역시": "G10",
+        "울산광역시": "H10",
+        "세종특별자치시": "I10",
+        "경기도": "J10",
+        "강원도": "K10",
+        "충청북도": "M10",
+        "충청남도": "N10",
+        "전라북도": "P10",
+        "전라남도": "Q10",
+        "경상북도": "R10",
+        "경상남도": "S10",
+        "제주특별자치도": "T10"
+    }
     
     # HTTP 헤더
     DEFAULT_HEADERS = {
@@ -77,6 +106,34 @@ class WeatherData:
     description: str
     wind_speed: float
     wind_direction: int
+
+@dataclass
+class SchoolData:
+    """학교 데이터 클래스"""
+    school_code: str
+    school_name: str
+    school_level: str
+    address: str
+    phone: str
+    fax: str
+    homepage: str
+
+@dataclass
+class MealData:
+    """급식 데이터 클래스"""
+    date: str
+    meal_type: str
+    menu: str
+    nutrition_info: str
+
+@dataclass
+class TimetableData:
+    """시간표 데이터 클래스"""
+    date: str
+    period: int
+    subject: str
+    teacher: str
+    classroom: str
 
 @dataclass
 class NewsData:
@@ -192,22 +249,146 @@ class DataFetcher:
                             utc_time = utc_tz.localize(date_obj)
                             korea_time = utc_time.astimezone(Constants.KOREA_TZ)
                             
+                            # 한국 시간으로 포맷팅
                             published = korea_time.strftime("%Y-%m-%d %H:%M")
-                        except:
+                        except Exception:
                             published = "최근"
                     
-                    # 중복 제거를 위해 이미 추가된 제목인지 확인
-                    existing_titles = [news.title for news in news_data]
-                    if title not in existing_titles:
-                        news_data.append(NewsData(title, link, source, published))
+                    news_data.append(NewsData(title, link, source, published))
             
-            return news_data[:20]  # 상위 20개 뉴스만 반환
+            return news_data[:20]  # 최대 20개만 반환
             
-        except requests.exceptions.RequestException as e:
-            st.error(f"Google 뉴스 RSS 피드에 접속할 수 없습니다: {e}")
-            return []
         except Exception as e:
-            st.error(f"뉴스 데이터를 파싱할 수 없습니다: {e}")
+            st.error(f"뉴스 데이터를 불러올 수 없습니다: {e}")
+            return []
+
+    @staticmethod
+    def get_schools(region_code: str, school_name: str = "") -> List[SchoolData]:
+        """학교 목록 조회"""
+        try:
+            params = {
+                'KEY': st.secrets.get("NEIS_API_KEY", ""),
+                'Type': 'json',
+                'ATPT_OFCDC_SC_CODE': region_code
+            }
+            
+            if school_name:
+                params['SCHUL_NM'] = school_name
+            
+            response = requests.get(Constants.NEIS_SCHOOL_INFO, params=params, timeout=Constants.REQUEST_TIMEOUT)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if 'schoolInfo' not in data:
+                return []
+            
+            schools = []
+            school_list = data['schoolInfo'][1]['row']
+            
+            for school in school_list:
+                schools.append(SchoolData(
+                    school_code=school.get('SD_SCHUL_CODE', ''),
+                    school_name=school.get('SCHUL_NM', ''),
+                    school_level=school.get('SCHUL_KND_SC_NM', ''),
+                    address=school.get('ORG_RDNMA', ''),
+                    phone=school.get('ORG_TELNO', ''),
+                    fax=school.get('ORG_FAXNO', ''),
+                    homepage=school.get('HMPG_ADRES', '')
+                ))
+            
+            return schools
+            
+        except Exception as e:
+            st.error(f"학교 정보를 불러올 수 없습니다: {e}")
+            return []
+
+    @staticmethod
+    def get_meals(school_code: str, date: str) -> List[MealData]:
+        """급식 정보 조회"""
+        try:
+            params = {
+                'KEY': st.secrets.get("NEIS_API_KEY", ""),
+                'Type': 'json',
+                'ATPT_OFCDC_SC_CODE': 'B10',  # 임시로 서울 사용
+                'SD_SCHUL_CODE': school_code,
+                'MLSV_YMD': date
+            }
+            
+            response = requests.get(Constants.NEIS_MEAL_INFO, params=params, timeout=Constants.REQUEST_TIMEOUT)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if 'mealServiceDietInfo' not in data:
+                return []
+            
+            meals = []
+            meal_list = data['mealServiceDietInfo'][1]['row']
+            
+            for meal in meal_list:
+                meals.append(MealData(
+                    date=meal.get('MLSV_YMD', ''),
+                    meal_type=meal.get('MMEAL_SC_NM', ''),
+                    menu=meal.get('DDISH_NM', ''),
+                    nutrition_info=meal.get('CAL_INFO', '')
+                ))
+            
+            return meals
+            
+        except Exception as e:
+            st.error(f"급식 정보를 불러올 수 없습니다: {e}")
+            return []
+
+    @staticmethod
+    def get_timetable(school_code: str, grade: str, class_num: str, date: str) -> List[TimetableData]:
+        """시간표 정보 조회"""
+        try:
+            # 학교 종류에 따라 다른 API 사용
+            school_level = "고등학교"  # 임시로 고등학교 사용
+            api_url = Constants.NEIS_HIS_TIMETABLE
+            
+            if school_level == "중학교":
+                api_url = Constants.NEIS_MIS_TIMETABLE
+            elif school_level == "초등학교":
+                api_url = Constants.NEIS_ELS_TIMETABLE
+            
+            params = {
+                'KEY': st.secrets.get("NEIS_API_KEY", ""),
+                'Type': 'json',
+                'ATPT_OFCDC_SC_CODE': 'B10',  # 임시로 서울 사용
+                'SD_SCHUL_CODE': school_code,
+                'GRADE': grade,
+                'CLASS_NM': class_num,
+                'TI_FROM_YMD': date,
+                'TI_TO_YMD': date
+            }
+            
+            response = requests.get(api_url, params=params, timeout=Constants.REQUEST_TIMEOUT)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if 'hisTimetable' not in data and 'misTimetable' not in data and 'elsTimetable' not in data:
+                return []
+            
+            timetable = []
+            timetable_key = 'hisTimetable' if school_level == "고등학교" else 'misTimetable' if school_level == "중학교" else 'elsTimetable'
+            timetable_list = data[timetable_key][1]['row']
+            
+            for item in timetable_list:
+                timetable.append(TimetableData(
+                    date=item.get('ALL_TI_YMD', ''),
+                    period=int(item.get('PERIO', 0)),
+                    subject=item.get('ITRT_CNTNT', ''),
+                    teacher=item.get('TEACHER_NM', ''),
+                    classroom=item.get('CLASS_NM', '')
+                ))
+            
+            return timetable
+            
+        except Exception as e:
+            st.error(f"시간표 정보를 불러올 수 없습니다: {e}")
             return []
 
 class DataProcessor:
@@ -320,11 +501,12 @@ class UIComponents:
             # 메뉴 선택
             menu = st.selectbox(
                 "메뉴 선택",
-                ["🏠 대시보드", "🌤️ 날씨 정보", "📰 뉴스", "⚙️ 설정"]
+                ["🏠 대시보드", "🏫 학교 정보", "🌤️ 날씨 정보", "📰 뉴스", "⚙️ 설정"]
             )
             
             st.markdown("---")
             st.markdown("### 📡 데이터 출처")
+            st.markdown("- **학교 정보**: NEIS Open API")
             st.markdown("- **날씨 정보**: OpenWeatherMap API")
             st.markdown("- **뉴스**: Google 뉴스 RSS")
             
@@ -360,6 +542,12 @@ class PageHandlers:
                 "title": "📰 뉴스",
                 "content": f"최신 뉴스 {len(news_data)}개"
             })
+        
+        # 학교 정보 (기본 정보)
+        support_info.append({
+            "title": "🏫 학교 정보",
+            "content": "NEIS Open API 연동"
+        })
         
         # 업데이트 정보 (항상 표시)
         support_info.append({
@@ -433,81 +621,175 @@ class PageHandlers:
     @staticmethod
     def show_news():
         """뉴스 페이지"""
-        st.header("📰 Google 뉴스 실시간 헤드라인")
-        st.caption("🕒 모든 시간은 한국 시간(UTC+9) 기준으로 표시됩니다.")
+        st.header("📰 뉴스")
         
         # 데이터 출처 정보
-        st.info("📡 Google 뉴스 RSS 피드에서 실시간으로 최신 뉴스를 가져옵니다.")
+        st.info("📡 Google 뉴스 RSS 피드를 통해 실시간 뉴스를 제공합니다.")
         
         news_data = CacheManager.get_cached_data("news", DataFetcher.get_news)
         
         if news_data:
-            # 표시할 뉴스 개수 선택
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                display_count = st.selectbox(
-                    "표시할 뉴스 개수",
-                    ["5개", "10개", "15개", "20개"],
-                    index=1
-                )
-            
-            # 선택된 개수에 따라 데이터 필터링
-            count_map = {"5개": 5, "10개": 10, "15개": 15, "20개": 20}
-            display_num = count_map[display_count]
-            filtered_news = news_data[:display_num]
-            
             # 뉴스 목록 표시
-            st.subheader(f"📋 최신 뉴스 {display_count}")
-            
-            for i, news in enumerate(filtered_news, 1):
+            for i, news in enumerate(news_data, 1):
                 with st.container():
-                    # 뉴스 카드 스타일
-                    st.markdown(f"""
-                    <div style="
-                        border: 1px solid #e0e0e0;
-                        border-radius: 8px;
-                        padding: 16px;
-                        margin: 8px 0;
-                        background-color: #f8f9fa;
-                    ">
-                        <h4 style="margin: 0 0 8px 0; color: #1f2937;">{i}. {news.title}</h4>
-                        <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
-                            📰 <strong>{news.source}</strong> | 📅 {news.published}
-                        </p>
-                        <a href="{news.link}" target="_blank" style="
-                            color: #3b82f6;
-                            text-decoration: none;
-                            font-weight: 500;
-                        ">🔗 기사 보기</a>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    col1, col2 = st.columns([4, 1])
+                    
+                    with col1:
+                        st.markdown(f"**{i}. {news.title}**")
+                        st.caption(f"출처: {news.source} | 발행: {news.published}")
+                    
+                    with col2:
+                        if st.button(f"링크 {i}", key=f"news_link_{i}"):
+                            st.markdown(f"[뉴스 보기]({news.link})")
+                    
+                    st.markdown("---")
             
-            # 뉴스 통계
-            st.subheader("📊 뉴스 통계")
+            # 뉴스 소스별 통계
+            st.subheader("📊 뉴스 소스별 통계")
+            source_counts = {}
+            for news in news_data:
+                source_counts[news.source] = source_counts.get(news.source, 0) + 1
             
-            # 출처별 뉴스 수
-            source_stats = {}
-            for news in filtered_news:
-                source = news.source
-                source_stats[source] = source_stats.get(source, 0) + 1
-            
-            if source_stats:
+            if source_counts:
                 fig = px.pie(
-                    values=list(source_stats.values()),
-                    names=list(source_stats.keys()),
-                    title=f"출처별 {display_count} 뉴스 분포"
+                    values=list(source_counts.values()),
+                    names=list(source_counts.keys()),
+                    title="뉴스 소스별 분포"
                 )
                 st.plotly_chart(fig, use_container_width=True)
-                
-                # 출처별 뉴스 수 테이블
-                st.subheader("📈 출처별 뉴스 수")
-                source_df = pd.DataFrame([
-                    {"출처": source, "뉴스 수": count}
-                    for source, count in source_stats.items()
-                ])
-                st.dataframe(source_df, use_container_width=True, hide_index=True)
         else:
-            st.warning("뉴스 데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.")
+            st.error("뉴스 데이터를 불러올 수 없습니다.")
+
+    @staticmethod
+    def show_school_info():
+        """학교 정보 페이지"""
+        st.header("🏫 학교 정보")
+        
+        # 1. 지역 선택
+        col1, col2 = st.columns(2)
+        with col1:
+            selected_region = st.selectbox(
+                "지역 선택",
+                list(Constants.REGIONS.keys()),
+                index=0
+            )
+        
+        # 2. 학교 검색
+        with col2:
+            school_search = st.text_input("학교명 검색 (키워드 입력)")
+        
+        # 3. 학교 목록 조회
+        if selected_region:
+            region_code = Constants.REGIONS[selected_region]
+            schools = CacheManager.get_cached_data(
+                f"schools_{region_code}_{school_search}", 
+                DataFetcher.get_schools, 
+                region_code, 
+                school_search
+            )
+            
+            if schools:
+                # 4. 학교 선택
+                school_names = [f"{school.school_name} ({school.school_level})" for school in schools]
+                selected_school_idx = st.selectbox(
+                    "학교 선택",
+                    range(len(school_names)),
+                    format_func=lambda x: school_names[x]
+                )
+                
+                if selected_school_idx is not None:
+                    selected_school = schools[selected_school_idx]
+                    
+                    # 학교 기본 정보 표시
+                    st.subheader(f"🏫 {selected_school.school_name}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write(f"**학교 종류**: {selected_school.school_level}")
+                        st.write(f"**주소**: {selected_school.address}")
+                        st.write(f"**전화번호**: {selected_school.phone}")
+                    
+                    with col2:
+                        st.write(f"**팩스**: {selected_school.fax}")
+                        st.write(f"**홈페이지**: {selected_school.homepage}")
+                    
+                    st.markdown("---")
+                    
+                    # 5. 학년/반/기간 선택
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        grade = st.selectbox("학년", ["1", "2", "3", "4", "5", "6"], index=0)
+                    
+                    with col2:
+                        class_num = st.selectbox("반", [str(i) for i in range(1, 21)], index=0)
+                    
+                    with col3:
+                        # 주간 기간 선택 (현재 주 기준)
+                        from datetime import datetime, timedelta
+                        today = datetime.now()
+                        monday = today - timedelta(days=today.weekday())
+                        
+                        week_options = []
+                        for i in range(-2, 3):  # 이전 2주 ~ 다음 2주
+                            week_start = monday + timedelta(weeks=i)
+                            week_end = week_start + timedelta(days=4)
+                            week_options.append({
+                                'start': week_start.strftime('%Y%m%d'),
+                                'end': week_end.strftime('%Y%m%d'),
+                                'label': f"{week_start.strftime('%m/%d')} ~ {week_end.strftime('%m/%d')}"
+                            })
+                        
+                        selected_week_idx = st.selectbox(
+                            "주간 선택",
+                            range(len(week_options)),
+                            format_func=lambda x: week_options[x]['label']
+                        )
+                    
+                    with col4:
+                        if st.button("정보 조회"):
+                            if selected_week_idx is not None:
+                                selected_week = week_options[selected_week_idx]
+                                
+                                # 6. 급식 정보 조회
+                                st.subheader("🍽️ 급식 정보")
+                                meals = DataFetcher.get_meals(selected_school.school_code, selected_week['start'])
+                                
+                                if meals:
+                                    for meal in meals:
+                                        st.write(f"**{meal.meal_type}**: {meal.menu}")
+                                        if meal.nutrition_info:
+                                            st.caption(f"영양정보: {meal.nutrition_info}")
+                                        st.markdown("---")
+                                else:
+                                    st.info("해당 기간의 급식 정보가 없습니다.")
+                                
+                                # 7. 시간표 정보 조회
+                                st.subheader("📚 시간표 정보")
+                                timetable = DataFetcher.get_timetable(
+                                    selected_school.school_code, 
+                                    grade, 
+                                    class_num, 
+                                    selected_week['start']
+                                )
+                                
+                                if timetable:
+                                    # 시간표를 교시별로 정렬
+                                    timetable.sort(key=lambda x: x.period)
+                                    
+                                    for item in timetable:
+                                        st.write(f"**{item.period}교시**: {item.subject}")
+                                        if item.teacher:
+                                            st.caption(f"담당교사: {item.teacher}")
+                                        if item.classroom:
+                                            st.caption(f"교실: {item.classroom}")
+                                        st.markdown("---")
+                                else:
+                                    st.info("해당 기간의 시간표 정보가 없습니다.")
+            else:
+                st.warning("해당 지역에서 학교를 찾을 수 없습니다.")
+        else:
+            st.info("지역을 선택해주세요.")
 
     @staticmethod
     def show_settings():
@@ -542,6 +824,7 @@ def main():
     # 메뉴별 처리
     menu_handlers = {
         "🏠 대시보드": PageHandlers.show_dashboard_overview,
+        "🏫 학교 정보": PageHandlers.show_school_info,
         "🌤️ 날씨 정보": PageHandlers.show_weather_info,
         "📰 뉴스": PageHandlers.show_news,
         "⚙️ 설정": PageHandlers.show_settings
