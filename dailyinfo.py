@@ -218,10 +218,19 @@ class DataFetcher:
                     pattern1 = r'(\d+)\.\s*([가-힣\s]+?)(?:\s+지음|\s+저|\s+편집|\s+글|\s+그림|\s+외|\s*\[|\s*$)'
                     matches1 = re.findall(pattern1, book_list_text)
                     
-                    # 패턴 2: [국내도서] + 제목
-                    pattern2 = r'\[국내도서\]([가-힣\s]+?)(?:\s+지음|\s+저|\s+편집|\s+글|\s+그림|\s+외|\s*\[|\s*$)'
-                    matches2 = re.findall(pattern2, book_list_text)
+                    # [국내도서] 패턴으로 제목 찾기 (수정된 패턴)
+                    title_pattern = r'\[국내도서\]([가-힣\s]+?)(?:\s*\(지은이\)|\s*\[|\s*$)'
+                    title_matches = re.findall(title_pattern, book_list_text)
                     
+                    if not title_matches:
+                        # 대안: 문자열 분할 방식
+                        if '[국내도서]' in book_list_text and '(지은이)' in book_list_text:
+                            start_idx = book_list_text.find('[국내도서]') + len('[국내도서]')
+                            end_idx = book_list_text.find('(지은이)')
+                            if start_idx < end_idx:
+                                title = book_list_text[start_idx:end_idx].strip()
+                                title_matches = [title]
+                
                     if matches1:
                         for match in matches1:
                             rank = int(match[0])
@@ -232,20 +241,54 @@ class DataFetcher:
                                 author = "저자 정보 없음"
                                 publisher = "출판사 정보 없음"
                                 
-                                # 저자 패턴 찾기
-                                author_pattern = r'([가-힣\s]+?)\s*지음|([가-힣\s]+?)\s*저|([가-힣\s]+?)\s*편집'
-                                author_matches = re.findall(author_pattern, book_list_text)
-                                if author_matches:
-                                    for author_match in author_matches:
-                                        if any(author_match):
-                                            author = next(a for a in author_match if a).strip()
-                                            break
+                                # 저자 패턴 찾기 (개선된 버전)
+                                # 패턴 1: (지은이) 패턴
+                                author_pattern1 = r'([가-힣\s]+?)\s*\(지은이\)'
+                                author_matches1 = re.findall(author_pattern1, book_list_text)
                                 
-                                # 출판사 패턴 찾기 (저자 다음에 나오는 경우)
-                                publisher_pattern = r'([가-힣\s]+?)\s*\|\s*([가-힣\s]+?)\s*\|'
-                                publisher_matches = re.findall(publisher_pattern, book_list_text)
-                                if publisher_matches:
-                                    publisher = publisher_matches[0][1].strip()
+                                # 패턴 2: | 구분자로 저자 찾기
+                                author_pattern2 = r'([가-힣\s]+?)\s*\|\s*([가-힣\s]+?)\s*\|'
+                                author_matches2 = re.findall(author_pattern2, book_list_text)
+                                
+                                # 저자 추출
+                                if author_matches1:
+                                    # 가장 긴 저자명 선택 (2글자 이상)
+                                    valid_authors = [auth for auth in author_matches1 if len(auth.strip()) >= 2]
+                                    if valid_authors:
+                                        longest_author = max(valid_authors, key=lambda x: len(x))
+                                        author = longest_author.strip()
+                                    else:
+                                        author = "저자 정보 없음"
+                                elif author_matches2:
+                                    author = author_matches2[0][0].strip()
+                                else:
+                                    author = "저자 정보 없음"
+                                
+                                # 제목에서 저자명 제거 (더 정확한 방법)
+                                if author != "저자 정보 없음" and author in title:
+                                    # 저자명이 제목 끝에 있는 경우에만 제거
+                                    if title.endswith(author):
+                                        title = title[:-len(author)].strip()
+                                        # 불필요한 구두점 제거
+                                        title = re.sub(r'\s*[-,\s]+\s*$', '', title)
+                                    elif title.endswith(author + ' '):
+                                        title = title[:-len(author + ' ')].strip()
+                                        title = re.sub(r'\s*[-,\s]+\s*$', '', title)
+                                
+                                # 출판사 패턴 찾기 (개선된 버전)
+                                # 패턴 1: | 구분자로 출판사 찾기
+                                publisher_pattern1 = r'([가-힣\s]+?)\s*\|\s*([가-힣\s]+?)\s*\|'
+                                publisher_matches1 = re.findall(publisher_pattern1, book_list_text)
+                                
+                                # 패턴 2: (지은이) 다음에 나오는 출판사
+                                publisher_pattern2 = r'\(지은이\)\s*\|\s*([가-힣\s]+?)\s*\|'
+                                publisher_matches2 = re.findall(publisher_pattern2, book_list_text)
+                                
+                                # 출판사 추출
+                                if publisher_matches2:
+                                    publisher = publisher_matches2[0].strip()
+                                elif publisher_matches1:
+                                    publisher = publisher_matches1[0][1].strip()
                                 
                                 # 중복 제거
                                 existing_titles = [book.title for book in book_data]
@@ -253,9 +296,9 @@ class DataFetcher:
                                     book_data.append(BookData(rank, title, author, publisher))
                                 break  # 첫 번째 매치만 사용
                     
-                    elif matches2:
+                    elif title_matches:
                         # 패턴2로 찾은 경우 순위는 인덱스 기반으로 설정
-                        for j, match in enumerate(matches2):
+                        for j, match in enumerate(title_matches):
                             rank = j + 1
                             title = match.strip()
                             
@@ -264,20 +307,54 @@ class DataFetcher:
                                 author = "저자 정보 없음"
                                 publisher = "출판사 정보 없음"
                                 
-                                # 저자 패턴 찾기
-                                author_pattern = r'([가-힣\s]+?)\s*지음|([가-힣\s]+?)\s*저|([가-힣\s]+?)\s*편집'
-                                author_matches = re.findall(author_pattern, book_list_text)
-                                if author_matches:
-                                    for author_match in author_matches:
-                                        if any(author_match):
-                                            author = next(a for a in author_match if a).strip()
-                                            break
+                                # 저자 패턴 찾기 (개선된 버전)
+                                # 패턴 1: (지은이) 패턴
+                                author_pattern1 = r'([가-힣\s]+?)\s*\(지은이\)'
+                                author_matches1 = re.findall(author_pattern1, book_list_text)
                                 
-                                # 출판사 패턴 찾기 (저자 다음에 나오는 경우)
-                                publisher_pattern = r'([가-힣\s]+?)\s*\|\s*([가-힣\s]+?)\s*\|'
-                                publisher_matches = re.findall(publisher_pattern, book_list_text)
-                                if publisher_matches:
-                                    publisher = publisher_matches[0][1].strip()
+                                # 패턴 2: | 구분자로 저자 찾기
+                                author_pattern2 = r'([가-힣\s]+?)\s*\|\s*([가-힣\s]+?)\s*\|'
+                                author_matches2 = re.findall(author_pattern2, book_list_text)
+                                
+                                # 저자 추출
+                                if author_matches1:
+                                    # 가장 긴 저자명 선택 (2글자 이상)
+                                    valid_authors = [auth for auth in author_matches1 if len(auth.strip()) >= 2]
+                                    if valid_authors:
+                                        longest_author = max(valid_authors, key=lambda x: len(x))
+                                        author = longest_author.strip()
+                                    else:
+                                        author = "저자 정보 없음"
+                                elif author_matches2:
+                                    author = author_matches2[0][0].strip()
+                                else:
+                                    author = "저자 정보 없음"
+                                
+                                # 제목에서 저자명 제거 (더 정확한 방법)
+                                if author != "저자 정보 없음" and author in title:
+                                    # 저자명이 제목 끝에 있는 경우에만 제거
+                                    if title.endswith(author):
+                                        title = title[:-len(author)].strip()
+                                        # 불필요한 구두점 제거
+                                        title = re.sub(r'\s*[-,\s]+\s*$', '', title)
+                                    elif title.endswith(author + ' '):
+                                        title = title[:-len(author + ' ')].strip()
+                                        title = re.sub(r'\s*[-,\s]+\s*$', '', title)
+                                
+                                # 출판사 패턴 찾기 (개선된 버전)
+                                # 패턴 1: | 구분자로 출판사 찾기
+                                publisher_pattern1 = r'([가-힣\s]+?)\s*\|\s*([가-힣\s]+?)\s*\|'
+                                publisher_matches1 = re.findall(publisher_pattern1, book_list_text)
+                                
+                                # 패턴 2: (지은이) 다음에 나오는 출판사
+                                publisher_pattern2 = r'\(지은이\)\s*\|\s*([가-힣\s]+?)\s*\|'
+                                publisher_matches2 = re.findall(publisher_pattern2, book_list_text)
+                                
+                                # 출판사 추출
+                                if publisher_matches2:
+                                    publisher = publisher_matches2[0].strip()
+                                elif publisher_matches1:
+                                    publisher = publisher_matches1[0][1].strip()
                                 
                                 # 중복 제거
                                 existing_titles = [book.title for book in book_data]
