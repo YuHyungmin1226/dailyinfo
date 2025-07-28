@@ -516,7 +516,7 @@ class UIComponents:
         if 'selected_class' not in st.session_state:
             st.session_state.selected_class = "1"
         if 'selected_week_idx' not in st.session_state:
-            st.session_state.selected_week_idx = 26  # 오늘 주간
+            st.session_state.selected_week_idx = None  # 브라우저 재시작 시 오늘 주간으로 설정
     
     @staticmethod
     def create_sidebar() -> str:
@@ -791,10 +791,16 @@ class PageHandlers:
                                 'label': f"{week_start.strftime('%Y년 %m월 %d일')} ~ {week_end.strftime('%m월 %d일')} ({week_start.strftime('%Y')}년)"
                             })
                         
+                        # 오늘을 포함하는 주의 인덱스 (항상 26)
+                        today_week_idx = 26
+                        
+                        # 세션 상태에서 주간 인덱스 가져오기 (없으면 오늘 주간)
+                        current_week_idx = st.session_state.selected_week_idx if st.session_state.selected_week_idx is not None else today_week_idx
+                        
                         selected_week_idx = st.selectbox(
                             "주간 선택",
                             range(len(week_options)),
-                            index=st.session_state.selected_week_idx,
+                            index=current_week_idx,
                             format_func=lambda x: week_options[x]['label'],
                             key="week_selectbox"
                         )
