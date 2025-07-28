@@ -125,6 +125,7 @@ class MealData:
     meal_type: str
     menu: str
     nutrition_info: str
+    day_name: str = ""  # 요일 정보
 
 @dataclass
 class TimetableData:
@@ -134,6 +135,7 @@ class TimetableData:
     subject: str
     teacher: str
     classroom: str
+    day_name: str = ""  # 요일 정보
 
 @dataclass
 class NewsData:
@@ -776,10 +778,34 @@ class PageHandlers:
                         
                         with tab1:
                             st.subheader("🍽️ 급식 정보")
-                            meals = DataFetcher.get_meals(selected_school.school_code, selected_week['start'])
                             
-                            if meals:
-                                for meal in meals:
+                            # 주간 전체 급식 정보 조회
+                            all_meals = []
+                            from datetime import datetime, timedelta
+                            
+                            # 주의 시작일부터 5일간 조회 (월~금)
+                            start_date = datetime.strptime(selected_week['start'], '%Y%m%d')
+                            for i in range(5):
+                                current_date = start_date + timedelta(days=i)
+                                date_str = current_date.strftime('%Y%m%d')
+                                day_name = current_date.strftime('%A')  # 요일
+                                
+                                daily_meals = DataFetcher.get_meals(selected_school.school_code, date_str)
+                                if daily_meals:
+                                    for meal in daily_meals:
+                                        meal.date = date_str
+                                        meal.day_name = day_name
+                                        all_meals.append(meal)
+                            
+                            if all_meals:
+                                # 날짜별로 그룹화하여 표시
+                                current_date = None
+                                for meal in all_meals:
+                                    if meal.date != current_date:
+                                        current_date = meal.date
+                                        date_obj = datetime.strptime(meal.date, '%Y%m%d')
+                                        st.markdown(f"### 📅 {date_obj.strftime('%Y년 %m월 %d일')} ({meal.day_name})")
+                                    
                                     with st.container():
                                         st.markdown(f"""
                                         <div style="
@@ -795,23 +821,43 @@ class PageHandlers:
                                         </div>
                                         """, unsafe_allow_html=True)
                             else:
-                                st.warning("🍽️ 해당 기간의 급식 정보가 없습니다.")
+                                st.warning("🍽️ 해당 주의 급식 정보가 없습니다.")
                                 st.info("💡 방학, 주말, 공휴일에는 급식 정보가 제공되지 않습니다.")
                         
                         with tab2:
                             st.subheader("📚 시간표 정보")
-                            timetable = DataFetcher.get_timetable(
-                                selected_school.school_code, 
-                                grade, 
-                                class_num, 
-                                selected_week['start']
-                            )
                             
-                            if timetable:
-                                # 시간표를 교시별로 정렬
-                                timetable.sort(key=lambda x: x.period)
+                            # 주간 전체 시간표 정보 조회
+                            all_timetables = []
+                            
+                            # 주의 시작일부터 5일간 조회 (월~금)
+                            start_date = datetime.strptime(selected_week['start'], '%Y%m%d')
+                            for i in range(5):
+                                current_date = start_date + timedelta(days=i)
+                                date_str = current_date.strftime('%Y%m%d')
+                                day_name = current_date.strftime('%A')  # 요일
                                 
-                                for item in timetable:
+                                daily_timetable = DataFetcher.get_timetable(
+                                    selected_school.school_code, 
+                                    grade, 
+                                    class_num, 
+                                    date_str
+                                )
+                                if daily_timetable:
+                                    for item in daily_timetable:
+                                        item.date = date_str
+                                        item.day_name = day_name
+                                        all_timetables.append(item)
+                            
+                            if all_timetables:
+                                # 날짜별로 그룹화하여 표시
+                                current_date = None
+                                for item in all_timetables:
+                                    if item.date != current_date:
+                                        current_date = item.date
+                                        date_obj = datetime.strptime(item.date, '%Y%m%d')
+                                        st.markdown(f"### 📅 {date_obj.strftime('%Y년 %m월 %d일')} ({item.day_name})")
+                                    
                                     with st.container():
                                         st.markdown(f"""
                                         <div style="
@@ -827,7 +873,7 @@ class PageHandlers:
                                         </div>
                                         """, unsafe_allow_html=True)
                             else:
-                                st.warning("📚 해당 기간의 시간표 정보가 없습니다.")
+                                st.warning("📚 해당 주의 시간표 정보가 없습니다.")
                                 st.info("💡 방학, 주말, 공휴일에는 시간표 정보가 제공되지 않습니다.")
             else:
                 st.warning("해당 지역에서 학교를 찾을 수 없습니다.")
