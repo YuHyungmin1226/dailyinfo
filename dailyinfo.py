@@ -200,48 +200,67 @@ class DataFetcher:
         book_data = []
         
         try:
-            # 상품 목록에서 책 정보 추출
-            products = soup.find_all('li')
+            # 전체 텍스트에서 패턴 매칭으로 데이터 추출
+            all_text = soup.get_text()
             
-            for product in products:
-                if len(book_data) >= 50:  # 페이지당 최대 50개
-                    break
-                
-                product_text = product.get_text(strip=True)
-                
-                # 순위 추출 (숫자로 시작하는 패턴)
-                rank_match = re.search(r'^(\d+)', product_text)
-                if not rank_match:
-                    continue
-                
-                rank = int(rank_match.group(1))
-                
-                # 책 제목 추출 (순위 다음에 오는 긴 텍스트)
-                title_match = re.search(r'^\d+\s+(.+?)(?:\s+외|\s+지음|\s+저|\s+편집)', product_text)
-                if not title_match:
-                    # 다른 패턴으로 시도
-                    title_match = re.search(r'^\d+\s+(.+?)(?:\s+\d{4}\.\d{2}\.\d{2}|\s+\d{2}\.\d{2})', product_text)
-                
-                if title_match:
-                    title = title_match.group(1).strip()
+            # 다양한 패턴으로 책 정보 추출
+            patterns = [
+                # 패턴 1: "1. 제목 저자 · 출판사"
+                r'(\d+)\.\s*([^·\n]+?)(?:\s+외|\s+지음|\s+저|\s+편집|\s+글|\s+그림)?\s*·\s*([^·\n]+?)(?:\s+\d{4}\.\d{2}\.\d{2}|\s+\d{2}\.\d{2}|\s+\d{1,2}%)?',
+                # 패턴 2: "1 제목 저자 · 출판사"
+                r'(\d+)\s+([^·\n]+?)(?:\s+외|\s+지음|\s+저|\s+편집|\s+글|\s+그림)?\s*·\s*([^·\n]+?)(?:\s+\d{4}\.\d{2}\.\d{2}|\s+\d{2}\.\d{2}|\s+\d{1,2}%)?',
+                # 패턴 3: "1. 제목 저자"
+                r'(\d+)\.\s*([^·\n]+?)(?:\s+외|\s+지음|\s+저|\s+편집|\s+글|\s+그림)',
+                # 패턴 4: "1 제목 저자"
+                r'(\d+)\s+([^·\n]+?)(?:\s+외|\s+지음|\s+저|\s+편집|\s+글|\s+그림)',
+            ]
+            
+            for pattern in patterns:
+                matches = re.findall(pattern, all_text)
+                for match in matches:
+                    if len(book_data) >= 50:  # 페이지당 최대 50개
+                        break
                     
-                    # 저자 추출
-                    author_match = re.search(r'(?:외|지음|저|편집)\s*([^·\s]+(?:\s+[^·\s]+)*)', product_text)
-                    if author_match:
-                        author = author_match.group(1).strip()
-                    else:
-                        author = "저자 정보 없음"
-                    
-                    # 출판사 추출
-                    publisher_match = re.search(r'·\s*([^·\s]+(?:\s+[^·\s]+)*)', product_text)
-                    if publisher_match:
-                        publisher = publisher_match.group(1).strip()
-                    else:
-                        publisher = "출판사 정보 없음"
-                    
-                    # 유효한 데이터인지 확인
-                    if title and len(title) > 2 and author != "저자 정보 없음":
-                        book_data.append(BookData(rank, title, author, publisher))
+                    if len(match) >= 2:
+                        rank = int(match[0])
+                        title = match[1].strip()
+                        
+                        # 저자와 출판사 추출
+                        if len(match) >= 3:
+                            # 세 번째 요소가 출판사인 경우
+                            publisher = match[2].strip()
+                            # 저자는 제목과 출판사 사이에서 추출
+                            author_match = re.search(r'^\d+[\.\s]+(.+?)(?:\s+외|\s+지음|\s+저|\s+편집|\s+글|\s+그림)\s*·', all_text)
+                            if author_match:
+                                author = author_match.group(1).strip()
+                            else:
+                                author = "저자 정보 없음"
+                        else:
+                            # 저자와 출판사가 함께 있는 경우
+                            author_publisher = match[1]
+                            # 저자 추출
+                            author_match = re.search(r'(?:외|지음|저|편집|글|그림)\s*([^·\s]+(?:\s+[^·\s]+)*)', author_publisher)
+                            if author_match:
+                                author = author_match.group(1).strip()
+                            else:
+                                author = "저자 정보 없음"
+                            
+                            # 출판사 추출
+                            publisher_match = re.search(r'·\s*([^·\s]+(?:\s+[^·\s]+)*)', author_publisher)
+                            if publisher_match:
+                                publisher = publisher_match.group(1).strip()
+                            else:
+                                publisher = "출판사 정보 없음"
+                        
+                        # 유효한 데이터인지 확인
+                        if title and len(title) > 2 and title != "저자 정보 없음":
+                            # 중복 제거
+                            existing_titles = [book.title for book in book_data]
+                            if title not in existing_titles:
+                                book_data.append(BookData(rank, title, author, publisher))
+            
+            # 순위별로 정렬
+            book_data.sort(key=lambda x: x.rank)
             
             return book_data
             
