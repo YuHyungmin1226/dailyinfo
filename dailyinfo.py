@@ -522,7 +522,10 @@ class UIComponents:
     def create_sidebar() -> str:
         """사이드바 생성"""
         with st.sidebar:
-            st.title("📊 DailyInfo")
+            # 클릭 가능한 타이틀 (새로고침 기능)
+            if st.button("📊 DailyInfo", key="sidebar_title_button", use_container_width=True):
+                st.rerun()
+            
             st.markdown("---")
             
             # 메뉴 선택
@@ -969,8 +972,11 @@ def main():
     UIComponents.setup_page()
     UIComponents.initialize_session_state()
     
-    # 헤더
-    st.markdown('<h1 class="main-header">📊 DailyInfo - 데이터 정보 대시보드</h1>', unsafe_allow_html=True)
+    # 헤더 (클릭 가능한 타이틀)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("📊 DailyInfo - 데이터 정보 대시보드", key="main_title_button", use_container_width=True):
+            st.rerun()
     
     # 사이드바 및 메뉴 처리
     menu = UIComponents.create_sidebar()
