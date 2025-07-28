@@ -715,8 +715,10 @@ class PageHandlers:
                     
                     st.markdown("---")
                     
-                    # 5. 학년/반/기간 선택
-                    col1, col2, col3, col4 = st.columns(4)
+                    # 5. 학년/반/기간 선택 및 정보 조회
+                    st.subheader("📋 정보 조회 설정")
+                    
+                    col1, col2, col3 = st.columns(3)
                     
                     with col1:
                         grade = st.selectbox("학년", ["1", "2", "3", "4", "5", "6"], index=0)
@@ -751,46 +753,70 @@ class PageHandlers:
                             format_func=lambda x: week_options[x]['label']
                         )
                     
-                    with col4:
-                        if st.button("정보 조회"):
+                    # 정보 조회 버튼을 중앙에 배치
+                    st.markdown("---")
+                    col1, col2, col3 = st.columns([1, 2, 1])
+                    with col2:
+                        if st.button("🔍 정보 조회하기", type="primary", use_container_width=True):
                             if selected_week_idx is not None:
                                 selected_week = week_options[selected_week_idx]
                                 
-                                # 6. 급식 정보 조회
-                                st.subheader("🍽️ 급식 정보")
-                                meals = DataFetcher.get_meals(selected_school.school_code, selected_week['start'])
+                                # 결과를 탭으로 구분하여 표시
+                                tab1, tab2 = st.tabs(["🍽️ 급식 정보", "📚 시간표 정보"])
                                 
-                                if meals:
-                                    for meal in meals:
-                                        st.write(f"**{meal.meal_type}**: {meal.menu}")
-                                        if meal.nutrition_info:
-                                            st.caption(f"영양정보: {meal.nutrition_info}")
-                                        st.markdown("---")
-                                else:
-                                    st.info("해당 기간의 급식 정보가 없습니다.")
-                                
-                                # 7. 시간표 정보 조회
-                                st.subheader("📚 시간표 정보")
-                                timetable = DataFetcher.get_timetable(
-                                    selected_school.school_code, 
-                                    grade, 
-                                    class_num, 
-                                    selected_week['start']
-                                )
-                                
-                                if timetable:
-                                    # 시간표를 교시별로 정렬
-                                    timetable.sort(key=lambda x: x.period)
+                                with tab1:
+                                    st.subheader("🍽️ 급식 정보")
+                                    meals = DataFetcher.get_meals(selected_school.school_code, selected_week['start'])
                                     
-                                    for item in timetable:
-                                        st.write(f"**{item.period}교시**: {item.subject}")
-                                        if item.teacher:
-                                            st.caption(f"담당교사: {item.teacher}")
-                                        if item.classroom:
-                                            st.caption(f"교실: {item.classroom}")
-                                        st.markdown("---")
-                                else:
-                                    st.info("해당 기간의 시간표 정보가 없습니다.")
+                                    if meals:
+                                        for meal in meals:
+                                            with st.container():
+                                                st.markdown(f"""
+                                                <div style="
+                                                    border: 1px solid #e0e0e0;
+                                                    border-radius: 8px;
+                                                    padding: 16px;
+                                                    margin: 8px 0;
+                                                    background-color: #f8f9fa;
+                                                ">
+                                                    <h4 style="margin: 0 0 8px 0; color: #1f2937;">🍽️ {meal.meal_type}</h4>
+                                                    <p style="margin: 4px 0; color: #374151;">{meal.menu}</p>
+                                                    {f'<p style="margin: 4px 0; color: #6b7280; font-size: 14px;">📊 영양정보: {meal.nutrition_info}</p>' if meal.nutrition_info else ''}
+                                                </div>
+                                                """, unsafe_allow_html=True)
+                                    else:
+                                        st.info("해당 기간의 급식 정보가 없습니다.")
+                                
+                                with tab2:
+                                    st.subheader("📚 시간표 정보")
+                                    timetable = DataFetcher.get_timetable(
+                                        selected_school.school_code, 
+                                        grade, 
+                                        class_num, 
+                                        selected_week['start']
+                                    )
+                                    
+                                    if timetable:
+                                        # 시간표를 교시별로 정렬
+                                        timetable.sort(key=lambda x: x.period)
+                                        
+                                        for item in timetable:
+                                            with st.container():
+                                                st.markdown(f"""
+                                                <div style="
+                                                    border: 1px solid #e0e0e0;
+                                                    border-radius: 8px;
+                                                    padding: 16px;
+                                                    margin: 8px 0;
+                                                    background-color: #f8f9fa;
+                                                ">
+                                                    <h4 style="margin: 0 0 8px 0; color: #1f2937;">📚 {item.period}교시 - {item.subject}</h4>
+                                                    {f'<p style="margin: 4px 0; color: #6b7280; font-size: 14px;">👨‍🏫 담당교사: {item.teacher}</p>' if item.teacher else ''}
+                                                    {f'<p style="margin: 4px 0; color: #6b7280; font-size: 14px;">🏫 교실: {item.classroom}</p>' if item.classroom else ''}
+                                                </div>
+                                                """, unsafe_allow_html=True)
+                                    else:
+                                        st.info("해당 기간의 시간표 정보가 없습니다.")
             else:
                 st.warning("해당 지역에서 학교를 찾을 수 없습니다.")
         else:
