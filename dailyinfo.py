@@ -8,6 +8,8 @@ import plotly.express as px
 from typing import List, Dict, Optional
 import asyncio
 import aiohttp
+from bs4 import BeautifulSoup
+import re
 
 # 페이지 설정
 st.set_page_config(
@@ -54,114 +56,188 @@ class DataFetcher:
     
     @staticmethod
     def get_bugs_chart() -> List[str]:
-        """벅스 차트 데이터 (Mock) - 100위까지"""
+        """벅스 차트 데이터 크롤링"""
         try:
-            mock_data = [
-                "1. NewJeans - Ditto",
-                "2. IVE - After LIKE",
-                "3. LE SSERAFIM - ANTIFRAGILE",
-                "4. aespa - Girls",
-                "5. BLACKPINK - Pink Venom",
-                "6. NewJeans - Hype Boy",
-                "7. IVE - Love Dive",
-                "8. LE SSERAFIM - FEARLESS",
-                "9. aespa - Next Level",
-                "10. BLACKPINK - How You Like That",
-                "11. NewJeans - Attention",
-                "12. IVE - Eleven",
-                "13. LE SSERAFIM - Blue Flame",
-                "14. aespa - Savage",
-                "15. BLACKPINK - Lovesick Girls",
-                "16. NewJeans - Cookie",
-                "17. IVE - Take It",
-                "18. LE SSERAFIM - The Great Mermaid",
-                "19. aespa - Dreams Come True",
-                "20. BLACKPINK - Ice Cream",
-                "21. Red Velvet - Feel My Rhythm",
-                "22. TWICE - Talk that Talk",
-                "23. ITZY - Sneakers",
-                "24. STAYC - Beautiful Monster",
-                "25. (G)I-DLE - Nxde",
-                "26. Red Velvet - Birthday",
-                "27. TWICE - Set Me Free",
-                "28. ITZY - Boys Like You",
-                "29. STAYC - Teddy Bear",
-                "30. (G)I-DLE - Queencard",
-                "31. Red Velvet - Psycho",
-                "32. TWICE - Moonlight Sunrise",
-                "33. ITZY - Cheshire",
-                "34. STAYC - Poppy",
-                "35. (G)I-DLE - My Bag",
-                "36. Red Velvet - FMR",
-                "37. TWICE - The Feels",
-                "38. ITZY - Voltage",
-                "39. STAYC - Young Luv",
-                "40. (G)I-DLE - Tomboy",
-                "41. Red Velvet - Queendom",
-                "42. TWICE - Scientist",
-                "43. ITZY - Loco",
-                "44. STAYC - Stereotype",
-                "45. (G)I-DLE - Hwaa",
-                "46. Red Velvet - Russian Roulette",
-                "47. TWICE - Alcohol-Free",
-                "48. ITZY - Mafia In The Morning",
-                "49. STAYC - ASAP",
-                "50. (G)I-DLE - Dumdi Dumdi",
-                "51. Red Velvet - Bad Boy",
-                "52. TWICE - More & More",
-                "53. ITZY - Wannabe",
-                "54. STAYC - So Bad",
-                "55. (G)I-DLE - Oh my god",
-                "56. Red Velvet - Peek-A-Boo",
-                "57. TWICE - Fancy",
-                "58. ITZY - Dalla Dalla",
-                "59. STAYC - Like This",
-                "60. (G)I-DLE - Lion",
-                "61. Red Velvet - Red Flavor",
-                "62. TWICE - TT",
-                "63. ITZY - Icy",
-                "64. STAYC - Run2U",
-                "65. (G)I-DLE - Uh-Oh",
-                "66. Red Velvet - Power Up",
-                "67. TWICE - What is Love?",
-                "68. ITZY - Not Shy",
-                "69. STAYC - Complex",
-                "70. (G)I-DLE - Senorita",
-                "71. Red Velvet - Rookie",
-                "72. TWICE - Likey",
-                "73. ITZY - In the morning",
-                "74. STAYC - Same Same",
-                "75. (G)I-DLE - Latata",
-                "76. Red Velvet - Dumb Dumb",
-                "77. TWICE - Signal",
-                "78. ITZY - MITM",
-                "79. STAYC - So What",
-                "80. (G)I-DLE - Hann",
-                "81. Red Velvet - Ice Cream Cake",
-                "82. TWICE - Knock Knock",
-                "83. ITZY - Swipe",
-                "84. STAYC - I'll Be There",
-                "85. (G)I-DLE - Blow Your Mind",
-                "86. Red Velvet - Automatic",
-                "87. TWICE - Heart Shaker",
-                "88. ITZY - Twenty",
-                "89. STAYC - Love Fool",
-                "90. (G)I-DLE - Give Me Your",
-                "91. Red Velvet - Be Natural",
-                "92. TWICE - Like Ooh-Ahh",
-                "93. ITZY - Cherry",
-                "94. STAYC - Butterfly",
-                "95. (G)I-DLE - Maze",
-                "96. Red Velvet - Happiness",
-                "97. TWICE - Cheer Up",
-                "98. ITZY - Want It?",
-                "99. STAYC - So Bad",
-                "100. (G)I-DLE - Dollar"
-            ]
-            return mock_data
+            # 벅스 차트 URL
+            url = "https://music.bugs.co.kr/chart/track/realtime/total?wl_ref=M_contents_03_01"
+            
+            # User-Agent 설정 (웹 브라우저로 인식되도록)
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+            
+            # 웹페이지 요청
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            
+            # HTML 파싱
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # 차트 데이터 추출
+            chart_data = []
+            
+            # 테이블에서 차트 데이터 찾기
+            table = soup.find('table', {'class': 'list'})
+            if table:
+                rows = table.find_all('tr')
+                
+                for row in rows[1:]:  # 헤더 제외
+                    cells = row.find_all('td')
+                    if len(cells) >= 3:
+                        # 순위 추출
+                        rank_cell = cells[0]
+                        rank_text = rank_cell.get_text(strip=True)
+                        rank_match = re.search(r'(\d+)', rank_text)
+                        if not rank_match:
+                            continue
+                        rank = rank_match.group(1)
+                        
+                        # 곡명 추출
+                        song_cell = cells[1]
+                        song_link = song_cell.find('a')
+                        if song_link:
+                            song_title = song_link.get_text(strip=True)
+                        else:
+                            song_title = song_cell.get_text(strip=True)
+                        
+                        # 아티스트 추출
+                        artist_cell = cells[2]
+                        artist_link = artist_cell.find('a')
+                        if artist_link:
+                            artist_name = artist_link.get_text(strip=True)
+                        else:
+                            artist_name = artist_cell.get_text(strip=True)
+                        
+                        # 데이터 정리
+                        if song_title and artist_name:
+                            chart_data.append(f"{rank}. {artist_name} - {song_title}")
+                            
+                        # 100위까지만 수집
+                        if len(chart_data) >= 100:
+                            break
+            
+            # 크롤링 실패 시 Mock 데이터 반환
+            if not chart_data:
+                st.warning("벅스 차트 크롤링에 실패했습니다. Mock 데이터를 사용합니다.")
+                return DataFetcher._get_mock_bugs_chart()
+            
+            return chart_data
+            
         except Exception as e:
             st.error(f"벅스 차트 데이터 수집 실패: {e}")
-            return []
+            st.info("Mock 데이터를 사용합니다.")
+            return DataFetcher._get_mock_bugs_chart()
+    
+    @staticmethod
+    def _get_mock_bugs_chart() -> List[str]:
+        """Mock 벅스 차트 데이터 (크롤링 실패 시 사용)"""
+        return [
+            "1. NewJeans - Ditto",
+            "2. IVE - After LIKE",
+            "3. LE SSERAFIM - ANTIFRAGILE",
+            "4. aespa - Girls",
+            "5. BLACKPINK - Pink Venom",
+            "6. NewJeans - Hype Boy",
+            "7. IVE - Love Dive",
+            "8. LE SSERAFIM - FEARLESS",
+            "9. aespa - Next Level",
+            "10. BLACKPINK - How You Like That",
+            "11. NewJeans - Attention",
+            "12. IVE - Eleven",
+            "13. LE SSERAFIM - Blue Flame",
+            "14. aespa - Savage",
+            "15. BLACKPINK - Lovesick Girls",
+            "16. NewJeans - Cookie",
+            "17. IVE - Take It",
+            "18. LE SSERAFIM - The Great Mermaid",
+            "19. aespa - Dreams Come True",
+            "20. BLACKPINK - Ice Cream",
+            "21. Red Velvet - Feel My Rhythm",
+            "22. TWICE - Talk that Talk",
+            "23. ITZY - Sneakers",
+            "24. STAYC - Beautiful Monster",
+            "25. (G)I-DLE - Nxde",
+            "26. Red Velvet - Birthday",
+            "27. TWICE - Set Me Free",
+            "28. ITZY - Boys Like You",
+            "29. STAYC - Teddy Bear",
+            "30. (G)I-DLE - Queencard",
+            "31. Red Velvet - Psycho",
+            "32. TWICE - Moonlight Sunrise",
+            "33. ITZY - Cheshire",
+            "34. STAYC - Poppy",
+            "35. (G)I-DLE - My Bag",
+            "36. Red Velvet - FMR",
+            "37. TWICE - The Feels",
+            "38. ITZY - Voltage",
+            "39. STAYC - Young Luv",
+            "40. (G)I-DLE - Tomboy",
+            "41. Red Velvet - Queendom",
+            "42. TWICE - Scientist",
+            "43. ITZY - Loco",
+            "44. STAYC - Stereotype",
+            "45. (G)I-DLE - Hwaa",
+            "46. Red Velvet - Russian Roulette",
+            "47. TWICE - Alcohol-Free",
+            "48. ITZY - Mafia In The Morning",
+            "49. STAYC - ASAP",
+            "50. (G)I-DLE - Dumdi Dumdi",
+            "51. Red Velvet - Bad Boy",
+            "52. TWICE - More & More",
+            "53. ITZY - Wannabe",
+            "54. STAYC - So Bad",
+            "55. (G)I-DLE - Oh my god",
+            "56. Red Velvet - Peek-A-Boo",
+            "57. TWICE - Fancy",
+            "58. ITZY - Dalla Dalla",
+            "59. STAYC - Like This",
+            "60. (G)I-DLE - Lion",
+            "61. Red Velvet - Red Flavor",
+            "62. TWICE - TT",
+            "63. ITZY - Icy",
+            "64. STAYC - Run2U",
+            "65. (G)I-DLE - Uh-Oh",
+            "66. Red Velvet - Power Up",
+            "67. TWICE - What is Love?",
+            "68. ITZY - Not Shy",
+            "69. STAYC - Complex",
+            "70. (G)I-DLE - Senorita",
+            "71. Red Velvet - Rookie",
+            "72. TWICE - Likey",
+            "73. ITZY - In the morning",
+            "74. STAYC - Same Same",
+            "75. (G)I-DLE - Latata",
+            "76. Red Velvet - Dumb Dumb",
+            "77. TWICE - Signal",
+            "78. ITZY - MITM",
+            "79. STAYC - So What",
+            "80. (G)I-DLE - Hann",
+            "81. Red Velvet - Ice Cream Cake",
+            "82. TWICE - Knock Knock",
+            "83. ITZY - Swipe",
+            "84. STAYC - I'll Be There",
+            "85. (G)I-DLE - Blow Your Mind",
+            "86. Red Velvet - Automatic",
+            "87. TWICE - Heart Shaker",
+            "88. ITZY - Twenty",
+            "89. STAYC - Love Fool",
+            "90. (G)I-DLE - Give Me Your",
+            "91. Red Velvet - Be Natural",
+            "92. TWICE - Like Ooh-Ahh",
+            "93. ITZY - Cherry",
+            "94. STAYC - Butterfly",
+            "95. (G)I-DLE - Maze",
+            "96. Red Velvet - Happiness",
+            "97. TWICE - Cheer Up",
+            "98. ITZY - Want It?",
+            "99. STAYC - So Bad",
+            "100. (G)I-DLE - Dollar"
+        ]
 
     @staticmethod
     def get_book_rankings() -> List[Dict]:
@@ -366,6 +442,9 @@ def show_dashboard_overview():
 def show_bugs_chart():
     """벅스 차트 페이지"""
     st.header("🎵 벅스 일간 차트 TOP 100")
+    
+    # 데이터 출처 정보
+    st.info("📡 실시간 벅스 차트 데이터를 크롤링하여 제공합니다.")
     
     data = get_cached_data("bugs_chart", DataFetcher.get_bugs_chart)
     
