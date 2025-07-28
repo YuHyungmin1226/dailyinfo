@@ -370,6 +370,10 @@ class DataFetcher:
                     title = title_elem.text.strip()
                     link = link_elem.text.strip()
                     
+                    # 제목이 너무 짧거나 비어있으면 건너뛰기
+                    if len(title) < 5:
+                        continue
+                    
                     # 출처 추출 (제목에서 마지막 괄호 부분)
                     source = "Google 뉴스"
                     if " - " in title:
@@ -389,7 +393,10 @@ class DataFetcher:
                         except:
                             published = "최근"
                     
-                    news_data.append(NewsData(title, link, source, published))
+                    # 중복 제거를 위해 이미 추가된 제목인지 확인
+                    existing_titles = [news.title for news in news_data]
+                    if title not in existing_titles:
+                        news_data.append(NewsData(title, link, source, published))
             
             return news_data[:20]  # 상위 20개 뉴스만 반환
             
