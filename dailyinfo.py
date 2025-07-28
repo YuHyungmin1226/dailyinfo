@@ -340,42 +340,54 @@ class PageHandlers:
     @staticmethod
     def show_dashboard_overview():
         """대시보드 개요 페이지"""
-        st.header("📊 대시보드 개요")
-        st.caption("🕒 모든 시간은 한국 시간(UTC+9) 기준으로 표시됩니다.")
+        st.header("🏠 DailyInfo 대시보드")
         
-        # 메트릭 카드들
-        col1, col2, col3 = st.columns(3)
+        # 지원 정보 수집
+        support_info = []
         
         # 날씨 정보
         weather_data = CacheManager.get_cached_data("weather_서울", DataFetcher.get_weather_info, "서울")
         if weather_data:
-            with col1:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <h3>🌤️ {weather_data.city} 날씨</h3>
-                    <p>{weather_data.temperature:.1f}°C, {weather_data.description}</p>
-                </div>
-                """, unsafe_allow_html=True)
+            support_info.append({
+                "title": f"🌤️ {weather_data.city} 날씨",
+                "content": f"{weather_data.temperature:.1f}°C, {weather_data.description}"
+            })
         
         # 뉴스 정보
         news_data = CacheManager.get_cached_data("news", DataFetcher.get_news)
         if news_data:
-            with col2:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <h3>📰 뉴스</h3>
-                    <p>최신 뉴스 {len(news_data)}개</p>
-                </div>
-                """, unsafe_allow_html=True)
+            support_info.append({
+                "title": "📰 뉴스",
+                "content": f"최신 뉴스 {len(news_data)}개"
+            })
         
-        # 업데이트 시간
-        with col3:
-            st.markdown("""
-            <div class="metric-card">
-                <h3>🕒 업데이트</h3>
-                <p>5분마다 자동 갱신</p>
-            </div>
-            """, unsafe_allow_html=True)
+        # 업데이트 정보 (항상 표시)
+        support_info.append({
+            "title": "🕒 업데이트",
+            "content": "5분마다 자동 갱신"
+        })
+        
+        # 지원 정보 수량에 따라 열 수 결정
+        info_count = len(support_info)
+        if info_count == 1:
+            cols = st.columns(1)
+        elif info_count == 2:
+            cols = st.columns(2)
+        elif info_count == 3:
+            cols = st.columns(3)
+        else:
+            cols = st.columns(4)  # 4개 이상인 경우 4열로 제한
+        
+        # 메트릭 카드들 표시
+        for i, info in enumerate(support_info):
+            if i < len(cols):
+                with cols[i]:
+                    st.markdown(f"""
+                    <div class="metric-card">
+                        <h3>{info['title']}</h3>
+                        <p>{info['content']}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
     @staticmethod
     def show_weather_info():
