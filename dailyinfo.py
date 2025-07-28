@@ -165,14 +165,25 @@ class DataFetcher:
 
     @staticmethod
     def get_book_rankings() -> List[BookData]:
-        """교보문고 실시간 베스트셀러 데이터"""
+        """교보문고 실시간 베스트셀러 데이터 (100개)"""
         try:
-            url = "https://store.kyobobook.co.kr/bestseller/realtime?page=1&per=50"
-            response = requests.get(url, headers=Constants.DEFAULT_HEADERS, timeout=Constants.REQUEST_TIMEOUT)
-            response.raise_for_status()
+            book_data = []
             
-            soup = BeautifulSoup(response.content, 'html.parser')
-            book_data = DataFetcher._parse_kyobo_chart(soup)
+            # 두 페이지에서 각각 50개씩 가져오기
+            for page in [1, 2]:
+                url = f"https://store.kyobobook.co.kr/bestseller/realtime?page={page}&per=50"
+                response = requests.get(url, headers=Constants.DEFAULT_HEADERS, timeout=Constants.REQUEST_TIMEOUT)
+                response.raise_for_status()
+                
+                soup = BeautifulSoup(response.content, 'html.parser')
+                page_data = DataFetcher._parse_kyobo_chart(soup, page)
+                
+                # 두 번째 페이지 데이터의 순위를 51-100으로 조정
+                if page == 2:
+                    for book in page_data:
+                        book.rank = book.rank + 50
+                
+                book_data.extend(page_data)
             
             return book_data
             
@@ -184,7 +195,7 @@ class DataFetcher:
             return []
     
     @staticmethod
-    def _parse_kyobo_chart(soup: BeautifulSoup) -> List[BookData]:
+    def _parse_kyobo_chart(soup: BeautifulSoup, page: int = 1) -> List[BookData]:
         """교보문고 베스트셀러 HTML 파싱"""
         book_data = []
         
@@ -193,7 +204,7 @@ class DataFetcher:
             products = soup.find_all('li')
             
             for product in products:
-                if len(book_data) >= 50:  # 최대 50개
+                if len(book_data) >= 50:  # 페이지당 최대 50개
                     break
                 
                 product_text = product.get_text(strip=True)
@@ -549,7 +560,7 @@ class PageHandlers:
     @staticmethod
     def show_book_rankings():
         """도서 순위 페이지"""
-        st.header("📚 교보문고 실시간 베스트셀러 TOP 50")
+        st.header("📚 교보문고 실시간 베스트셀러 TOP 100")
         
         data = CacheManager.get_cached_data("book_rankings", DataFetcher.get_book_rankings)
         
