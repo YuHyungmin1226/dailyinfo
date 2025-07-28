@@ -210,15 +210,17 @@ class DataFetcher:
             book_lists = soup.find_all('div', class_='ss_book_list')
             
             if book_lists:
-                for i, book_list in enumerate(book_lists):
+                valid_count = 0  # 유효한 책 개수 카운터
+                for book_list in book_lists:
                     book_list_text = book_list.get_text(strip=True)
                     
                     # [국내도서]가 포함된 요소만 분석
                     if '[국내도서]' not in book_list_text:
                         continue
                     
-                    # 순위 계산 (페이지별)
-                    rank = (page - 1) * 50 + i + 1
+                    # 순위 계산 (페이지별로 정확하게)
+                    rank = (page - 1) * 50 + valid_count + 1
+                    valid_count += 1
                     
                     # 제목 추출 (개선된 방식)
                     title = ""
@@ -288,62 +290,14 @@ class DataFetcher:
                                 longest_publisher = max(valid_publishers, key=lambda x: len(x[0]) if x[0] else 0)
                                 publisher = longest_publisher[0].strip() if longest_publisher[0] else longest_publisher[1].strip()
                         
-                        # 5단계: 제목 정리 (완전히 개선된 방식)
-                        # 제목에서 불필요한 문자 제거
+                        # 5단계: 제목 정리 (기본 정리만)
+                        # 제목에서 연속된 공백만 제거
                         title = re.sub(r'\s+', ' ', title)  # 연속된 공백 제거
-                        title = re.sub(r'ㅣ.*$', '', title)  # ㅣ 이후 제거
-                        title = re.sub(r'Choice.*$', '', title)  # Choice 이후 제거
-                        title = re.sub(r'정가제.*$', '', title)  # 정가제 이후 제거
-                        title = re.sub(r'FREE.*$', '', title)  # FREE 이후 제거
-                        title = re.sub(r'시리즈.*$', '', title)  # 시리즈 이후 제거
-                        title = re.sub(r'수상작.*$', '', title)  # 수상작 이후 제거
-                        title = re.sub(r'개정판.*$', '', title)  # 개정판 이후 제거
-                        title = re.sub(r'특별증보판.*$', '', title)  # 특별증보판 이후 제거
-                        title = re.sub(r'4th Edition.*$', '', title)  # 4th Edition 이후 제거
-                        title = re.sub(r'특장판.*$', '', title)  # 특장판 이후 제거
-                        title = re.sub(r'티저.*$', '', title)  # 티저 이후 제거
-                        title = re.sub(r'일러스트.*$', '', title)  # 일러스트 이후 제거
-                        title = re.sub(r'스탠드.*$', '', title)  # 스탠드 이후 제거
-                        title = re.sub(r'박스.*$', '', title)  # 박스 이후 제거
-                        title = re.sub(r'사운드북.*$', '', title)  # 사운드북 이후 제거
-                        title = re.sub(r'EP.*$', '', title)  # EP 이후 제거
-                        title = re.sub(r'집.*$', '', title)  # 집 이후 제거
-                        title = re.sub(r'레시피.*$', '', title)  # 레시피 이후 제거
-                        title = re.sub(r'어남선생.*$', '', title)  # 어남선생 이후 제거
-                        title = re.sub(r'집밥.*$', '', title)  # 집밥 이후 제거
-                        title = re.sub(r'아동문고.*$', '', title)  # 아동문고 이후 제거
-                        title = re.sub(r'뮤지컬.*$', '', title)  # 뮤지컬 이후 제거
-                        title = re.sub(r'발레곡.*$', '', title)  # 발레곡 이후 제거
-                        title = re.sub(r'호두까기.*$', '', title)  # 호두까기 이후 제거
-                        title = re.sub(r'인형.*$', '', title)  # 인형 이후 제거
-                        title = re.sub(r'듣는 소설.*$', '', title)  # 듣는 소설 이후 제거
-                        title = re.sub(r'기출.*$', '', title)  # 기출 이후 제거
-                        title = re.sub(r'500제.*$', '', title)  # 500제 이후 제거
-                        title = re.sub(r'능력검정시험.*$', '', title)  # 능력검정시험 이후 제거
-                        title = re.sub(r'심화.*$', '', title)  # 심화 이후 제거
-                        title = re.sub(r'시험 대비.*$', '', title)  # 시험 대비 이후 제거
-                        title = re.sub(r'수록.*$', '', title)  # 수록 이후 제거
-                        title = re.sub(r'별★.*$', '', title)  # 별★ 이후 제거
-                        title = re.sub(r'부커상.*$', '', title)  # 부커상 이후 제거
-                        title = re.sub(r'연금.*$', '', title)  # 연금 이후 제거
-                        title = re.sub(r'통장.*$', '', title)  # 통장 이후 제거
-                        title = re.sub(r'만 원.*$', '', title)  # 만 원 이후 제거
-                        title = re.sub(r'만들기.*$', '', title)  # 만들기 이후 제거
-                        title = re.sub(r'경험.*$', '', title)  # 경험 이후 제거
-                        title = re.sub(r'기술.*$', '', title)  # 기술 이후 제거
-                        title = re.sub(r'대체.*$', '', title)  # 대체 이후 제거
-                        title = re.sub(r'시대.*$', '', title)  # 시대 이후 제거
-                        title = re.sub(r'인간.*$', '', title)  # 인간 이후 제거
-                        title = re.sub(r'계속.*$', '', title)  # 계속 이후 제거
-                        title = re.sub(r'수 있을까.*$', '', title)  # 수 있을까 이후 제거
-                        title = re.sub(r'크리스틴.*$', '', title)  # 크리스틴 이후 제거
-                        title = re.sub(r'로젠.*$', '', title)  # 로젠 이후 제거
-                        title = re.sub(r'어크로스.*$', '', title)  # 어크로스 이후 제거
                         title = title.strip()
                         
                         # 제목이 너무 길면 적절히 자르기
-                        if len(title) > 60:
-                            title = title[:60] + "..."
+                        if len(title) > 80:
+                            title = title[:80] + "..."
                         
                         # 유효한 제목인지 확인
                         if len(title) > 3 and title:
