@@ -165,19 +165,77 @@ class DataFetcher:
 
     @staticmethod
     def get_book_rankings() -> List[BookData]:
-        """도서 순위 데이터"""
+        """교보문고 실시간 베스트셀러 데이터"""
         try:
-            # 실제 도서 순위 데이터 (임시로 하드코딩, 나중에 실제 API로 교체)
-            book_data = [
-                BookData(1, "어떻게 하면 좋을까요?", "김철수", "행복출판사"),
-                BookData(2, "성공하는 방법", "이영희", "성공출판사"),
-                BookData(3, "프로그래밍 기초", "박개발", "코딩출판사"),
-                BookData(4, "요리 레시피", "최요리", "맛있는출판사"),
-                BookData(5, "여행 가이드", "정여행", "여행출판사")
-            ]
+            url = "https://store.kyobobook.co.kr/bestseller/realtime?page=1&per=50"
+            response = requests.get(url, headers=Constants.DEFAULT_HEADERS, timeout=Constants.REQUEST_TIMEOUT)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            book_data = DataFetcher._parse_kyobo_chart(soup)
+            
             return book_data
+            
+        except requests.exceptions.RequestException as e:
+            st.error(f"교보문고 웹사이트에 접속할 수 없습니다: {e}")
+            return []
         except Exception as e:
-            st.error(f"도서 순위 데이터를 불러올 수 없습니다: {e}")
+            st.error(f"도서 순위 데이터 수집 중 오류가 발생했습니다: {e}")
+            return []
+    
+    @staticmethod
+    def _parse_kyobo_chart(soup: BeautifulSoup) -> List[BookData]:
+        """교보문고 베스트셀러 HTML 파싱"""
+        book_data = []
+        
+        try:
+            # 상품 목록에서 책 정보 추출
+            products = soup.find_all('li')
+            
+            for product in products:
+                if len(book_data) >= 50:  # 최대 50개
+                    break
+                
+                product_text = product.get_text(strip=True)
+                
+                # 순위 추출 (숫자로 시작하는 패턴)
+                rank_match = re.search(r'^(\d+)', product_text)
+                if not rank_match:
+                    continue
+                
+                rank = int(rank_match.group(1))
+                
+                # 책 제목 추출 (순위 다음에 오는 긴 텍스트)
+                title_match = re.search(r'^\d+\s+(.+?)(?:\s+외|\s+지음|\s+저|\s+편집)', product_text)
+                if not title_match:
+                    # 다른 패턴으로 시도
+                    title_match = re.search(r'^\d+\s+(.+?)(?:\s+\d{4}\.\d{2}\.\d{2}|\s+\d{2}\.\d{2})', product_text)
+                
+                if title_match:
+                    title = title_match.group(1).strip()
+                    
+                    # 저자 추출
+                    author_match = re.search(r'(?:외|지음|저|편집)\s*([^·\s]+(?:\s+[^·\s]+)*)', product_text)
+                    if author_match:
+                        author = author_match.group(1).strip()
+                    else:
+                        author = "저자 정보 없음"
+                    
+                    # 출판사 추출
+                    publisher_match = re.search(r'·\s*([^·\s]+(?:\s+[^·\s]+)*)', product_text)
+                    if publisher_match:
+                        publisher = publisher_match.group(1).strip()
+                    else:
+                        publisher = "출판사 정보 없음"
+                    
+                    # 유효한 데이터인지 확인
+                    if title and len(title) > 2 and author != "저자 정보 없음":
+                        book_data.append(BookData(rank, title, author, publisher))
+            
+            return book_data
+            
+        except Exception as e:
+            st.error(f"교보문고 차트 파싱 중 오류: {e}")
             return []
 
     @staticmethod
@@ -491,7 +549,7 @@ class PageHandlers:
     @staticmethod
     def show_book_rankings():
         """도서 순위 페이지"""
-        st.header("📚 알라딘 베스트셀러 TOP 50")
+        st.header("📚 교보문고 실시간 베스트셀러 TOP 50")
         
         data = CacheManager.get_cached_data("book_rankings", DataFetcher.get_book_rankings)
         
