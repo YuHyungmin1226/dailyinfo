@@ -109,20 +109,8 @@ class DataFetcher:
         """벅스 차트 HTML 파싱"""
         chart_data = []
         
-        # 다양한 테이블 클래스 시도
-        table_selectors = [
-            'table.list',
-            'table.chart-table',
-            'table',
-            '.chart-list table',
-            '#chartList table'
-        ]
-        
-        table = None
-        for selector in table_selectors:
-            table = soup.select_one(selector)
-            if table:
-                break
+        # 차트 테이블 찾기
+        table = soup.find('table', class_='list')
         
         if not table:
             st.warning("차트 테이블을 찾을 수 없습니다. 웹사이트 구조가 변경되었을 수 있습니다.")
@@ -135,37 +123,37 @@ class DataFetcher:
                 break
                 
             cells = row.find_all('td')
-            if len(cells) < 3:
+            if len(cells) < 6:  # 최소 6개 셀이 필요
                 continue
             
-            chart_item = DataFetcher._extract_chart_item(cells)
+            chart_item = DataFetcher._extract_chart_item(cells, row)
             if chart_item:
                 chart_data.append(chart_item)
         
         return chart_data
     
     @staticmethod
-    def _extract_chart_item(cells: List) -> Optional[str]:
+    def _extract_chart_item(cells: List, row) -> Optional[str]:
         """차트 항목 추출"""
         try:
-            # 순위 추출
-            rank_text = cells[0].get_text(strip=True)
-            rank_match = re.search(r'(\d+)', rank_text)
-            if not rank_match:
-                return None
-            rank = rank_match.group(1)
+            # 순위 추출 (ranking div에서)
+            rank = "N/A"
+            ranking_div = row.find('div', class_='ranking')
+            if ranking_div:
+                strong_tag = ranking_div.find('strong')
+                if strong_tag:
+                    rank = strong_tag.get_text(strip=True)
             
-            # 곡명 추출
-            song_cell = cells[1]
-            song_link = song_cell.find('a')
-            song_title = song_link.get_text(strip=True) if song_link else song_cell.get_text(strip=True)
+            # 곡명 추출 (앨범 셀에서 - 6번째 셀)
+            song_title = cells[5].get_text(strip=True) if len(cells) > 5 else "N/A"
             
-            # 아티스트 추출
-            artist_cell = cells[2]
-            artist_link = artist_cell.find('a')
-            artist_name = artist_link.get_text(strip=True) if artist_link else artist_cell.get_text(strip=True)
+            # 아티스트 추출 (아티스트 링크에서)
+            artist_name = "N/A"
+            artist_link = row.find('a', href=re.compile(r'/artist/'))
+            if artist_link:
+                artist_name = artist_link.get_text(strip=True)
             
-            if song_title and artist_name:
+            if song_title and artist_name and song_title != "N/A" and artist_name != "N/A":
                 return f"{rank}. {artist_name} - {song_title}"
             
         except Exception:
