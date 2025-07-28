@@ -531,7 +531,7 @@ class UIComponents:
             # 메뉴 선택
             menu = st.selectbox(
                 "메뉴 선택",
-                ["🏠 대시보드", "🏫 학교 정보", "🌤️ 날씨 정보", "📰 뉴스", "⚙️ 설정"]
+                ["🌤️ 날씨 정보", "📰 뉴스", "🏫 학교 정보", "⚙️ 설정"]
             )
             
             st.markdown("---")
@@ -549,63 +549,7 @@ class UIComponents:
 class PageHandlers:
     """페이지 핸들러 클래스"""
     
-    @staticmethod
-    def show_dashboard_overview():
-        """대시보드 개요 페이지"""
-        st.header("🏠 DailyInfo 대시보드")
-        
-        # 지원 정보 수집
-        support_info = []
-        
-        # 날씨 정보
-        weather_data = CacheManager.get_cached_data("weather_서울", DataFetcher.get_weather_info, "서울")
-        if weather_data:
-            support_info.append({
-                "title": f"🌤️ {weather_data.city} 날씨",
-                "content": f"{weather_data.temperature:.1f}°C, {weather_data.description}"
-            })
-        
-        # 뉴스 정보
-        news_data = CacheManager.get_cached_data("news", DataFetcher.get_news)
-        if news_data:
-            support_info.append({
-                "title": "📰 뉴스",
-                "content": f"최신 뉴스 {len(news_data)}개"
-            })
-        
-        # 학교 정보 (기본 정보)
-        support_info.append({
-            "title": "🏫 학교 정보",
-            "content": "NEIS Open API 연동"
-        })
-        
-        # 업데이트 정보 (항상 표시)
-        support_info.append({
-            "title": "🕒 업데이트",
-            "content": "5분마다 자동 갱신"
-        })
-        
-        # 지원 정보 수량에 따라 열 수 결정
-        info_count = len(support_info)
-        if info_count == 1:
-            cols = st.columns(1)
-        elif info_count == 2:
-            cols = st.columns(2)
-        elif info_count == 3:
-            cols = st.columns(3)
-        else:
-            cols = st.columns(4)  # 4개 이상인 경우 4열로 제한
-        
-        # 메트릭 카드들 표시
-        for i, info in enumerate(support_info):
-            if i < len(cols):
-                with cols[i]:
-                    st.markdown(f"""
-                    <div class="metric-card">
-                        <h3>{info['title']}</h3>
-                        <p>{info['content']}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+
 
     @staticmethod
     def show_weather_info():
@@ -980,10 +924,9 @@ def main():
     
     # 메뉴별 처리
     menu_handlers = {
-        "🏠 대시보드": PageHandlers.show_dashboard_overview,
-        "🏫 학교 정보": PageHandlers.show_school_info,
         "🌤️ 날씨 정보": PageHandlers.show_weather_info,
         "📰 뉴스": PageHandlers.show_news,
+        "🏫 학교 정보": PageHandlers.show_school_info,
         "⚙️ 설정": PageHandlers.show_settings
     }
     
