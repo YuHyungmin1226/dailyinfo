@@ -27,6 +27,7 @@ class Constants:
     
     # URL
     BUGS_CHART_URL = "https://music.bugs.co.kr/chart/track/realtime/total?wl_ref=M_contents_03_01"
+    GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko"
     
     # HTTP 헤더
     DEFAULT_HEADERS = {
@@ -343,32 +344,60 @@ class DataFetcher:
 
     @staticmethod
     def get_news() -> List[NewsData]:
-        """뉴스 데이터"""
+        """Google 뉴스 RSS 피드에서 뉴스 데이터 가져오기"""
         try:
-            # 실제 뉴스 데이터 (임시로 하드코딩, 나중에 실제 API로 교체)
-            news_data = [
-                NewsData(
-                    "AI 기술 발전으로 새로운 가능성 열려",
-                    "https://example.com/news1",
-                    "테크뉴스",
-                    "2024-01-15"
-                ),
-                NewsData(
-                    "환경 보호를 위한 새로운 정책 발표",
-                    "https://example.com/news2",
-                    "환경일보",
-                    "2024-01-15"
-                ),
-                NewsData(
-                    "경제 회복 신호 포착",
-                    "https://example.com/news3",
-                    "경제신문",
-                    "2024-01-15"
-                )
-            ]
-            return news_data
+            import xml.etree.ElementTree as ET
+            from datetime import datetime
+            
+            # Google 뉴스 RSS 피드 요청
+            response = requests.get(Constants.GOOGLE_NEWS_RSS_URL, 
+                                  headers=Constants.DEFAULT_HEADERS, 
+                                  timeout=Constants.REQUEST_TIMEOUT)
+            response.raise_for_status()
+            
+            # XML 파싱
+            root = ET.fromstring(response.content)
+            
+            news_data = []
+            
+            # RSS 피드에서 뉴스 항목 추출
+            for item in root.findall('.//item'):
+                title_elem = item.find('title')
+                link_elem = item.find('link')
+                pub_date_elem = item.find('pubDate')
+                
+                if title_elem is not None and link_elem is not None:
+                    title = title_elem.text.strip()
+                    link = link_elem.text.strip()
+                    
+                    # 출처 추출 (제목에서 마지막 괄호 부분)
+                    source = "Google 뉴스"
+                    if " - " in title:
+                        title_parts = title.split(" - ")
+                        if len(title_parts) >= 2:
+                            title = " - ".join(title_parts[:-1])
+                            source = title_parts[-1]
+                    
+                    # 날짜 파싱
+                    published = "최근"
+                    if pub_date_elem is not None:
+                        try:
+                            # RFC 822 형식의 날짜를 파싱
+                            date_str = pub_date_elem.text.strip()
+                            date_obj = datetime.strptime(date_str, "%a, %d %b %Y %H:%M:%S %Z")
+                            published = date_obj.strftime("%Y-%m-%d %H:%M")
+                        except:
+                            published = "최근"
+                    
+                    news_data.append(NewsData(title, link, source, published))
+            
+            return news_data[:20]  # 상위 20개 뉴스만 반환
+            
+        except requests.exceptions.RequestException as e:
+            st.error(f"Google 뉴스 RSS 피드에 접속할 수 없습니다: {e}")
+            return []
         except Exception as e:
-            st.error(f"뉴스 데이터를 불러올 수 없습니다: {e}")
+            st.error(f"뉴스 데이터를 파싱할 수 없습니다: {e}")
             return []
 
 class DataProcessor:
@@ -703,17 +732,80 @@ class PageHandlers:
     @staticmethod
     def show_news():
         """뉴스 페이지"""
-        st.header("📰 최신 뉴스")
+        st.header("📰 Google 뉴스 실시간 헤드라인")
+        
+        # 데이터 출처 정보
+        st.info("📡 Google 뉴스 RSS 피드에서 실시간으로 최신 뉴스를 가져옵니다.")
         
         news_data = CacheManager.get_cached_data("news", DataFetcher.get_news)
         
         if news_data:
-            for i, news in enumerate(news_data, 1):
+            # 표시할 뉴스 개수 선택
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                display_count = st.selectbox(
+                    "표시할 뉴스 개수",
+                    ["5개", "10개", "15개", "20개"],
+                    index=1
+                )
+            
+            # 선택된 개수에 따라 데이터 필터링
+            count_map = {"5개": 5, "10개": 10, "15개": 15, "20개": 20}
+            display_num = count_map[display_count]
+            filtered_news = news_data[:display_num]
+            
+            # 뉴스 목록 표시
+            st.subheader(f"📋 최신 뉴스 {display_count}")
+            
+            for i, news in enumerate(filtered_news, 1):
                 with st.container():
-                    st.markdown(f"### {i}. {news.title}")
-                    st.markdown(f"**출처**: {news.source} | **날짜**: {news.published}")
-                    st.markdown(f"[기사 보기]({news.link})")
-                    st.divider()
+                    # 뉴스 카드 스타일
+                    st.markdown(f"""
+                    <div style="
+                        border: 1px solid #e0e0e0;
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin: 8px 0;
+                        background-color: #f8f9fa;
+                    ">
+                        <h4 style="margin: 0 0 8px 0; color: #1f2937;">{i}. {news.title}</h4>
+                        <p style="margin: 4px 0; color: #6b7280; font-size: 14px;">
+                            📰 <strong>{news.source}</strong> | 📅 {news.published}
+                        </p>
+                        <a href="{news.link}" target="_blank" style="
+                            color: #3b82f6;
+                            text-decoration: none;
+                            font-weight: 500;
+                        ">🔗 기사 보기</a>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            # 뉴스 통계
+            st.subheader("📊 뉴스 통계")
+            
+            # 출처별 뉴스 수
+            source_stats = {}
+            for news in filtered_news:
+                source = news.source
+                source_stats[source] = source_stats.get(source, 0) + 1
+            
+            if source_stats:
+                fig = px.pie(
+                    values=list(source_stats.values()),
+                    names=list(source_stats.keys()),
+                    title=f"출처별 {display_count} 뉴스 분포"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # 출처별 뉴스 수 테이블
+                st.subheader("📈 출처별 뉴스 수")
+                source_df = pd.DataFrame([
+                    {"출처": source, "뉴스 수": count}
+                    for source, count in source_stats.items()
+                ])
+                st.dataframe(source_df, use_container_width=True, hide_index=True)
+        else:
+            st.warning("뉴스 데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.")
 
     @staticmethod
     def show_settings():
