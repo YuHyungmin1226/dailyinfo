@@ -1,135 +1,177 @@
-# 📊 DailyInfo - 일일 정보 수집 및 대시보드
+# DailyInfo - 데이터 정보 대시보드
 
-일일 정보를 자동으로 수집하고 웹 대시보드로 제공하는 Python 애플리케이션입니다.
+## 프로젝트 소개
+DailyInfo는 다양한 실시간 정보를 한 곳에서 확인할 수 있는 Streamlit 기반 대시보드 애플리케이션입니다. 개선된 UI/UX와 데이터 시각화 기능을 제공합니다.
 
-## ✨ 주요 기능
+## 🚀 주요 기능
 
-### 📈 데이터 수집
-- **음원 차트**: 멜론, 벅스 일간 차트 TOP 100
-- **도서 순위**: 알라딘 베스트셀러 TOP 50
-- **주식 정보**: 일일 주식 추천 및 분석
-- **뉴스**: 구글 뉴스 최신 기사
-- **날씨**: 서울 날씨 정보
+### 📊 대시보드 개요
+- 전체 시스템 현황을 한눈에 확인
+- 최근 업데이트 시간 표시
+- 메트릭 카드 형태의 직관적인 정보 제공
 
-### 🌐 웹 대시보드
-- **Streamlit 기반**: 직관적인 웹 인터페이스
-- **실시간 업데이트**: 최신 정보 자동 수집
-- **반응형 디자인**: 모바일/데스크톱 호환
+### 🎵 음악 차트
+- **벅스 일간 차트**: TOP 100 실시간 확인
+- 인터랙티브 차트 시각화
+- 아티스트별 색상 구분
+- 순위 범위 선택 (TOP 10/20/50/100)
 
-## 🚀 설치 및 실행
+### 📚 도서 정보
+- **알라딘 베스트셀러**: TOP 50 확인
+- 출판사별 통계 차트
+- 구조화된 데이터 표시
+
+### 🌤️ 날씨 정보
+- **서울 실시간 날씨**: OpenWeatherMap API 연동
+- 기온, 습도, 바람 속도, 날씨 상태
+- 직관적인 메트릭 카드 표시
+
+### 📰 뉴스
+- **최신 뉴스**: 실시간 뉴스 피드
+- 출처 및 발행일 정보
+- 클릭 가능한 링크 제공
+
+### ⚙️ 설정
+- 캐시 관리 (1-60분 설정 가능)
+- API 키 설정
+- 시스템 설정 관리
+
+## 🛠️ 기술 스택
+
+### Frontend
+- **Streamlit**: 웹 애플리케이션 프레임워크
+- **Plotly**: 인터랙티브 차트 및 시각화
+- **CSS**: 커스텀 스타일링
+
+### Backend
+- **Python 3.8+**: 메인 프로그래밍 언어
+- **Pandas**: 데이터 처리 및 분석
+- **Requests**: HTTP 요청 처리
+- **Aiohttp**: 비동기 HTTP 클라이언트
+
+### 데이터 처리
+- **BeautifulSoup4**: 웹 스크래핑
+- **Selenium**: 동적 웹페이지 처리
+- **NumPy**: 수치 계산
+
+## 📦 설치 방법
 
 ### 1. 저장소 클론
 ```bash
-git clone https://github.com/YuHyungmin1226/dailyinfo.git
+git clone [repository-url]
 cd dailyinfo
 ```
 
-### 2. 의존성 설치
+### 2. 가상환경 생성 및 활성화
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# macOS/Linux
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 3. 의존성 설치
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. 애플리케이션 실행
+### 4. 환경 변수 설정 (선택사항)
+날씨 API를 사용하려면 OpenWeatherMap API 키가 필요합니다:
+
 ```bash
-streamlit run streamlit_dashboard.py
+# .streamlit/secrets.toml 파일 생성
+[secrets]
+WEATHER_API_KEY = "your_openweathermap_api_key_here"
 ```
 
-### 4. 브라우저에서 접속
-```
-http://localhost:8501
-```
-
-## 📁 파일 구조
-
-```
-dailyinfo/
-├── streamlit_dashboard.py      # 메인 웹 대시보드
-├── daily_info.py              # 일일 정보 수집기 (13KB, 327줄)
-├── melon_daily_chart.py       # 멜론 차트 수집
-├── bugs_daily_chart.py        # 벅스 차트 수집
-├── book_rank.py              # 도서 베스트셀러 수집
-├── daily_stock_recommendation.py  # 주식 추천 시스템
-├── NewsPost.py               # 뉴스 수집
-├── NewsAlert.py              # 뉴스 알림
-├── Weather_review_auto.py    # 날씨 정보 수집
-├── requirements.txt          # Python 의존성
-├── README.md                # 프로젝트 문서
-└── README_ORIGINAL.md       # 원본 README
-```
-
-## 🎯 사용 방법
-
-### 웹 대시보드
-1. **멜론 일간 차트**: TOP 100 곡 목록
-2. **벅스 일간 차트**: TOP 100 곡 목록
-3. **도서 순위**: 알라딘 베스트셀러 TOP 50
-4. **날씨 정보**: 서울 현재 날씨
-5. **뉴스**: 구글 뉴스 최신 10건
-
-### 개별 모듈 실행
+## 🚀 실행 방법
 ```bash
-# 일일 정보 수집기
-python daily_info.py
-
-# 멜론 차트 수집
-python melon_daily_chart.py
-
-# 벅스 차트 수집
-python bugs_daily_chart.py
-
-# 도서 순위 수집
-python book_rank.py
-
-# 주식 추천
-python daily_stock_recommendation.py
-
-# 뉴스 수집
-python NewsPost.py
-
-# 날씨 정보
-python Weather_review_auto.py
+streamlit run dailyinfo.py
 ```
 
-## 🛠️ 기술 스택
+실행 후 웹 브라우저에서 `http://localhost:8501`로 접속하여 대시보드를 확인할 수 있습니다.
 
-- **Frontend**: Streamlit
-- **Backend**: Python 3.7+
-- **웹 스크래핑**: requests, beautifulsoup4
-- **스케줄링**: schedule
-- **텍스트 처리**: textblob
+## 📖 사용법
 
-## 📊 데이터 소스
+### 1. 대시보드 탐색
+- 왼쪽 사이드바에서 원하는 정보 카테고리를 선택
+- 각 섹션별로 실시간 데이터 확인
+- 인터랙티브 차트와 그래프 활용
 
-- **멜론**: https://www.melon.com
-- **벅스**: https://music.bugs.co.kr
-- **알라딘**: https://www.aladin.co.kr
-- **구글 뉴스**: https://news.google.com
-- **OpenWeatherMap**: 날씨 API
+### 2. 데이터 시각화
+- 차트에 마우스 오버하여 상세 정보 확인
+- 차트 확대/축소 및 이동 가능
+- 데이터 테이블 정렬 및 필터링
 
-## 🔧 커스터마이징
+### 3. 설정 관리
+- 캐시 유지 시간 조정 (1-60분)
+- API 키 설정
+- 캐시 초기화
 
-### 새로운 데이터 소스 추가
-`streamlit_dashboard.py`에 새로운 메뉴 항목과 함수를 추가할 수 있습니다.
+## 🔧 주요 개선사항
 
-### 스케줄링 설정
-`daily_info.py`에서 자동 수집 주기를 조정할 수 있습니다.
+### 성능 최적화
+- **캐싱 시스템**: 5분 기본 캐시로 API 호출 최소화
+- **세션 상태 관리**: 사용자별 데이터 저장
+- **비동기 처리**: 동시 데이터 로딩 지원
 
-## 📄 라이선스
+### UI/UX 개선
+- **반응형 디자인**: 다양한 화면 크기 지원
+- **직관적인 네비게이션**: 이모지와 아이콘 활용
+- **로딩 상태 표시**: 사용자 피드백 제공
 
-이 프로젝트는 MIT 라이선스 하에 배포됩니다.
+### 데이터 시각화
+- **인터랙티브 차트**: Plotly 기반 차트
+- **메트릭 카드**: 핵심 정보 강조 표시
+- **구조화된 데이터**: 테이블 형태로 정리
 
-## 👨‍💻 개발자
+### 에러 처리
+- **강화된 예외 처리**: 구체적인 에러 메시지
+- **Fallback 데이터**: API 실패 시 Mock 데이터 제공
+- **사용자 친화적 메시지**: 명확한 안내
 
-**YuHyungmin1226** - [GitHub](https://github.com/YuHyungmin1226)
+## 📝 주의사항
+
+### 필수 요구사항
+- Python 3.8 이상
+- 인터넷 연결 필수
+- 최소 4GB RAM 권장
+
+### API 사용
+- OpenWeatherMap API 키는 무료 계정으로도 사용 가능
+- 일일 API 호출 제한 확인 필요
+- 웹 스크래핑 시 해당 웹사이트의 이용약관 준수
+
+### 성능 고려사항
+- 캐시 설정으로 API 호출 최소화
+- 대용량 데이터 처리 시 메모리 사용량 모니터링
+- 동시 사용자 수에 따른 서버 리소스 관리
 
 ## 🤝 기여하기
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+### 버그 리포트
+- GitHub Issues를 통해 버그 리포트
+- 상세한 재현 단계와 환경 정보 포함
+
+### 기능 제안
+- 새로운 기능 아이디어 제안
+- 사용 사례와 기대 효과 설명
+
+### 코드 기여
+- Fork 후 Pull Request 제출
+- 코드 스타일 가이드 준수
+
+## 📄 라이선스
+이 프로젝트는 MIT 라이선스 하에 배포됩니다.
+
+## 📞 지원
+- **이슈 트래커**: GitHub Issues
+- **문서**: 이 README 파일 참조
+- **커뮤니티**: GitHub Discussions
 
 ---
 
-⭐ 이 프로젝트가 도움이 되었다면 스타를 눌러주세요! 
+**DailyInfo** - 더 나은 정보 접근성을 위한 대시보드 🚀 
