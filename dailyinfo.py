@@ -40,7 +40,29 @@ class Constants:
         'Upgrade-Insecure-Requests': '1',
     }
     
-    # 서울 좌표
+    # 주요 도시 좌표
+    CITIES = {
+        "서울": {"lat": 37.5665, "lon": 126.9780, "name": "서울"},
+        "부산": {"lat": 35.1796, "lon": 129.0756, "name": "부산"},
+        "대구": {"lat": 35.8714, "lon": 128.6014, "name": "대구"},
+        "인천": {"lat": 37.4563, "lon": 126.7052, "name": "인천"},
+        "광주": {"lat": 35.1595, "lon": 126.8526, "name": "광주"},
+        "대전": {"lat": 36.3504, "lon": 127.3845, "name": "대전"},
+        "울산": {"lat": 35.5384, "lon": 129.3114, "name": "울산"},
+        "세종": {"lat": 36.4800, "lon": 127.2890, "name": "세종"},
+        "수원": {"lat": 37.2636, "lon": 127.0286, "name": "수원"},
+        "고양": {"lat": 37.6584, "lon": 126.8320, "name": "고양"},
+        "용인": {"lat": 37.2411, "lon": 127.1776, "name": "용인"},
+        "창원": {"lat": 35.2278, "lon": 128.6817, "name": "창원"},
+        "포항": {"lat": 36.0320, "lon": 129.3650, "name": "포항"},
+        "전주": {"lat": 35.8242, "lon": 127.1480, "name": "전주"},
+        "청주": {"lat": 36.6424, "lon": 127.4890, "name": "청주"},
+        "춘천": {"lat": 37.8813, "lon": 127.7300, "name": "춘천"},
+        "강릉": {"lat": 37.7519, "lon": 128.8760, "name": "강릉"},
+        "제주": {"lat": 33.4996, "lon": 126.5312, "name": "제주"}
+    }
+    
+    # 서울 좌표 (기본값)
     SEOUL_LAT = 37.5665
     SEOUL_LON = 126.9780
     
@@ -57,6 +79,7 @@ class ChartRange(Enum):
 @dataclass
 class WeatherData:
     """날씨 데이터 클래스"""
+    city: str
     temperature: float
     humidity: int
     description: str
@@ -161,7 +184,7 @@ class DataFetcher:
 
 
     @staticmethod
-    def get_weather_info() -> Optional[WeatherData]:
+    def get_weather_info(city_name: str = "서울") -> Optional[WeatherData]:
         """날씨 정보 수집"""
         try:
             # Streamlit secrets에서 먼저 시도, 없으면 환경 변수에서 시도
@@ -174,10 +197,17 @@ class DataFetcher:
                 st.error("OpenWeatherMap API 키가 설정되지 않았습니다. Streamlit Cloud의 Settings > Secrets에서 WEATHER_API_KEY를 설정해주세요.")
                 return None
             
+            # 선택된 도시의 좌표 가져오기
+            if city_name not in Constants.CITIES:
+                st.error(f"지원하지 않는 도시입니다: {city_name}")
+                return None
+            
+            city_data = Constants.CITIES[city_name]
+            
             url = f"https://api.openweathermap.org/data/2.5/weather"
             params = {
-                'lat': Constants.SEOUL_LAT,
-                'lon': Constants.SEOUL_LON,
+                'lat': city_data["lat"],
+                'lon': city_data["lon"],
                 'appid': weather_api_key,
                 'units': 'metric',
                 'lang': 'kr'
@@ -188,6 +218,7 @@ class DataFetcher:
             if response.status_code == 200:
                 data = response.json()
                 return WeatherData(
+                    city=city_data["name"],
                     temperature=data["main"]["temp"],
                     humidity=data["main"]["humidity"],
                     description=data["weather"][0]["description"],
@@ -312,19 +343,28 @@ class DataProcessor:
     @staticmethod
     def create_weather_display(weather_data: WeatherData) -> None:
         """날씨 정보 표시"""
-        if not weather_data:
-            return
-            
-        col1, col2, col3, col4 = st.columns(4)
+        st.subheader(f"🌤️ {weather_data.city} 날씨 정보")
+        
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("기온", f"{weather_data.temperature}°C")
+            st.metric("🌡️ 기온", f"{weather_data.temperature:.1f}°C")
+        
         with col2:
-            st.metric("습도", f"{weather_data.humidity}%")
+            st.metric("💧 습도", f"{weather_data.humidity}%")
+        
         with col3:
-            st.metric("바람", f"{weather_data.wind_speed} m/s")
-        with col4:
-            st.metric("날씨", weather_data.description)
+            st.metric("💨 풍속", f"{weather_data.wind_speed:.1f} m/s")
+        
+        # 날씨 설명
+        st.info(f"📝 날씨 상태: {weather_data.description}")
+        
+        # 바람 방향
+        directions = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"]
+        direction_index = int((weather_data.wind_direction + 22.5) / 45) % 8
+        wind_direction = directions[direction_index]
+        
+        st.write(f"🧭 바람 방향: {wind_direction} ({weather_data.wind_direction}°)")
 
 class CacheManager:
     """캐시 관리 클래스"""
@@ -442,13 +482,16 @@ class PageHandlers:
             </div>
             """, unsafe_allow_html=True)
         
-        with col2:
-            st.markdown("""
-            <div class="metric-card">
-                <h3>🌤️ 날씨 정보</h3>
-                <p>서울 실시간 날씨</p>
-            </div>
-            """, unsafe_allow_html=True)
+        # 날씨 정보
+        weather_data = CacheManager.get_cached_data("weather_서울", DataFetcher.get_weather_info, "서울")
+        if weather_data:
+            with col2:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3>🌤️ {weather_data.city} 날씨</h3>
+                    <p>{weather_data.temperature:.1f}°C, {weather_data.description}</p>
+                </div>
+                """, unsafe_allow_html=True)
             
         with col3:
             st.markdown("""
@@ -530,18 +573,46 @@ class PageHandlers:
     @staticmethod
     def show_weather_info():
         """날씨 정보 페이지"""
-        st.header("🌤️ 서울 날씨 정보")
+        st.header("🌤️ 날씨 정보")
         
-        weather_data = CacheManager.get_cached_data("weather_info", DataFetcher.get_weather_info)
+        # 데이터 출처 정보
+        st.info("📡 OpenWeatherMap API를 통해 실시간 날씨 정보를 제공합니다.")
+        
+        # 도시 선택
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            selected_city = st.selectbox(
+                "도시 선택",
+                list(Constants.CITIES.keys()),
+                index=0
+            )
+        
+        # 선택된 도시의 날씨 정보 가져오기
+        weather_data = CacheManager.get_cached_data(
+            f"weather_{selected_city}", 
+            DataFetcher.get_weather_info, 
+            selected_city
+        )
         
         if weather_data:
             DataProcessor.create_weather_display(weather_data)
             
-            # 날씨 설명
-            st.subheader("📝 날씨 상세 정보")
-            st.write(f"현재 서울의 날씨는 **{weather_data.description}**입니다.")
-            st.write(f"기온: {weather_data.temperature}°C, 습도: {weather_data.humidity}%")
-            st.write(f"바람: {weather_data.wind_speed} m/s")
+            # 추가 정보
+            st.markdown("---")
+            st.subheader("📊 날씨 상세 정보")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write(f"**도시**: {weather_data.city}")
+                st.write(f"**기온**: {weather_data.temperature:.1f}°C")
+                st.write(f"**습도**: {weather_data.humidity}%")
+            
+            with col2:
+                st.write(f"**풍속**: {weather_data.wind_speed:.1f} m/s")
+                st.write(f"**풍향**: {weather_data.wind_direction}°")
+                st.write(f"**날씨**: {weather_data.description}")
+        else:
+            st.error("날씨 정보를 불러올 수 없습니다.")
 
     @staticmethod
     def show_news():
