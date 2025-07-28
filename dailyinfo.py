@@ -851,28 +851,52 @@ class PageHandlers:
                                         all_timetables.append(item)
                             
                             if all_timetables:
-                                # 날짜별로 그룹화하여 표시
-                                current_date = None
+                                # 날짜별로 그룹화하여 테이블로 표시
+                                from collections import defaultdict
+                                
+                                # 날짜별로 시간표 데이터 그룹화
+                                date_timetables = defaultdict(list)
                                 for item in all_timetables:
-                                    if item.date != current_date:
-                                        current_date = item.date
-                                        date_obj = datetime.strptime(item.date, '%Y%m%d')
-                                        st.markdown(f"### 📅 {date_obj.strftime('%Y년 %m월 %d일')} ({item.day_name})")
+                                    date_timetables[item.date].append(item)
+                                
+                                # 각 날짜별로 테이블 생성
+                                for date, timetable_items in date_timetables.items():
+                                    date_obj = datetime.strptime(date, '%Y%m%d')
+                                    day_name = date_obj.strftime('%A')
                                     
-                                    with st.container():
-                                        st.markdown(f"""
-                                        <div style="
-                                            border: 1px solid #e0e0e0;
-                                            border-radius: 8px;
-                                            padding: 16px;
-                                            margin: 8px 0;
-                                            background-color: #f8f9fa;
-                                        ">
-                                            <h4 style="margin: 0 0 8px 0; color: #1f2937;">📚 {item.period}교시 - {item.subject}</h4>
-                                            {f'<p style="margin: 4px 0; color: #6b7280; font-size: 14px;">👨‍🏫 담당교사: {item.teacher}</p>' if item.teacher else ''}
-                                            {f'<p style="margin: 4px 0; color: #6b7280; font-size: 14px;">🏫 교실: {item.classroom}</p>' if item.classroom else ''}
-                                        </div>
-                                        """, unsafe_allow_html=True)
+                                    st.markdown(f"### 📅 {date_obj.strftime('%Y년 %m월 %d일')} ({day_name})")
+                                    
+                                    # 교시별로 정렬
+                                    timetable_items.sort(key=lambda x: x.period)
+                                    
+                                    # 테이블 데이터 준비
+                                    table_data = []
+                                    for item in timetable_items:
+                                        table_data.append({
+                                            "교시": f"{item.period}교시",
+                                            "과목": item.subject,
+                                            "담당교사": item.teacher if item.teacher else "-",
+                                            "교실": item.classroom if item.classroom else "-"
+                                        })
+                                    
+                                    # Streamlit 테이블로 표시
+                                    if table_data:
+                                        df = pd.DataFrame(table_data)
+                                        st.dataframe(
+                                            df,
+                                            use_container_width=True,
+                                            hide_index=True,
+                                            column_config={
+                                                "교시": st.column_config.TextColumn("교시", width="medium"),
+                                                "과목": st.column_config.TextColumn("과목", width="large"),
+                                                "담당교사": st.column_config.TextColumn("담당교사", width="medium"),
+                                                "교실": st.column_config.TextColumn("교실", width="medium")
+                                            }
+                                        )
+                                    else:
+                                        st.info("해당 날짜의 시간표 정보가 없습니다.")
+                                    
+                                    st.markdown("---")
                             else:
                                 st.warning("📚 해당 주의 시간표 정보가 없습니다.")
                                 st.info("💡 방학, 주말, 공휴일에는 시간표 정보가 제공되지 않습니다.")
