@@ -252,38 +252,38 @@ class DataFetcher:
                                 if title not in existing_titles:
                                     book_data.append(BookData(rank, title, author, publisher))
                                 break  # 첫 번째 매치만 사용
-                
-                elif matches2:
-                    # 패턴2로 찾은 경우 순위는 인덱스 기반으로 설정
-                    for i, match in enumerate(matches2):
-                        rank = i + 1
-                        title = match.strip()
-                        
-                        if len(title) > 3:  # 유효한 제목인지 확인
-                            # 저자와 출판사 정보 추출 시도
-                            author = "저자 정보 없음"
-                            publisher = "출판사 정보 없음"
+                    
+                    elif matches2:
+                        # 패턴2로 찾은 경우 순위는 인덱스 기반으로 설정
+                        for j, match in enumerate(matches2):
+                            rank = j + 1
+                            title = match.strip()
                             
-                            # 저자 패턴 찾기
-                            author_pattern = r'([가-힣\s]+?)\s*지음|([가-힣\s]+?)\s*저|([가-힣\s]+?)\s*편집'
-                            author_matches = re.findall(author_pattern, book_list_text)
-                            if author_matches:
-                                for author_match in author_matches:
-                                    if any(author_match):
-                                        author = next(a for a in author_match if a).strip()
-                                        break
-                            
-                            # 출판사 패턴 찾기 (저자 다음에 나오는 경우)
-                            publisher_pattern = r'([가-힣\s]+?)\s*\|\s*([가-힣\s]+?)\s*\|'
-                            publisher_matches = re.findall(publisher_pattern, book_list_text)
-                            if publisher_matches:
-                                publisher = publisher_matches[0][1].strip()
-                            
-                            # 중복 제거
-                            existing_titles = [book.title for book in book_data]
-                            if title not in existing_titles:
-                                book_data.append(BookData(rank, title, author, publisher))
-                            break  # 첫 번째 매치만 사용
+                            if len(title) > 3:  # 유효한 제목인지 확인
+                                # 저자와 출판사 정보 추출 시도
+                                author = "저자 정보 없음"
+                                publisher = "출판사 정보 없음"
+                                
+                                # 저자 패턴 찾기
+                                author_pattern = r'([가-힣\s]+?)\s*지음|([가-힣\s]+?)\s*저|([가-힣\s]+?)\s*편집'
+                                author_matches = re.findall(author_pattern, book_list_text)
+                                if author_matches:
+                                    for author_match in author_matches:
+                                        if any(author_match):
+                                            author = next(a for a in author_match if a).strip()
+                                            break
+                                
+                                # 출판사 패턴 찾기 (저자 다음에 나오는 경우)
+                                publisher_pattern = r'([가-힣\s]+?)\s*\|\s*([가-힣\s]+?)\s*\|'
+                                publisher_matches = re.findall(publisher_pattern, book_list_text)
+                                if publisher_matches:
+                                    publisher = publisher_matches[0][1].strip()
+                                
+                                # 중복 제거
+                                existing_titles = [book.title for book in book_data]
+                                if title not in existing_titles:
+                                    book_data.append(BookData(rank, title, author, publisher))
+                                break  # 첫 번째 매치만 사용
             
             # 2. 책 상품 링크에서 제목 추출
             if not book_data:
