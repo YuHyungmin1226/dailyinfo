@@ -206,61 +206,114 @@ class DataFetcher:
         book_data = []
         
         try:
-            # 알라딘 베스트셀러 테이블에서 책 정보 추출
-            # 여러 가능한 선택자 시도
-            selectors = [
-                'tr.ss_book_box',
-                'tr[class*="ss_book"]',
-                'tr[class*="book"]',
-                'div.ss_book_box',
-                'div[class*="ss_book"]',
-                'li.ss_book_box',
-                'li[class*="ss_book"]'
-            ]
+            # 1. ss_book_list 클래스를 가진 요소들에서 책 정보 추출
+            book_lists = soup.find_all('div', class_='ss_book_list')
             
-            book_items = []
-            for selector in selectors:
-                book_items = soup.select(selector)
-                if book_items:
-                    break
+            if book_lists:
+                for i, book_list in enumerate(book_lists[:50]):  # 최대 50개
+                    book_list_text = book_list.get_text(strip=True)
+                    
+                    # 순위와 제목 패턴 찾기
+                    # 패턴 1: 숫자 + 제목 (더 정확한 패턴)
+                    pattern1 = r'(\d+)\.\s*([가-힣\s]+?)(?:\s+지음|\s+저|\s+편집|\s+글|\s+그림|\s+외|\s*\[|\s*$)'
+                    matches1 = re.findall(pattern1, book_list_text)
+                    
+                    # 패턴 2: [국내도서] + 제목
+                    pattern2 = r'\[국내도서\]([가-힣\s]+?)(?:\s+지음|\s+저|\s+편집|\s+글|\s+그림|\s+외|\s*\[|\s*$)'
+                    matches2 = re.findall(pattern2, book_list_text)
+                    
+                    if matches1:
+                        for match in matches1:
+                            rank = int(match[0])
+                            title = match[1].strip()
+                            
+                            if len(title) > 3:  # 유효한 제목인지 확인
+                                # 저자와 출판사 정보 추출 시도
+                                author = "저자 정보 없음"
+                                publisher = "출판사 정보 없음"
+                                
+                                # 저자 패턴 찾기
+                                author_pattern = r'([가-힣\s]+?)\s*지음|([가-힣\s]+?)\s*저|([가-힣\s]+?)\s*편집'
+                                author_matches = re.findall(author_pattern, book_list_text)
+                                if author_matches:
+                                    for author_match in author_matches:
+                                        if any(author_match):
+                                            author = next(a for a in author_match if a).strip()
+                                            break
+                                
+                                # 출판사 패턴 찾기 (저자 다음에 나오는 경우)
+                                publisher_pattern = r'([가-힣\s]+?)\s*\|\s*([가-힣\s]+?)\s*\|'
+                                publisher_matches = re.findall(publisher_pattern, book_list_text)
+                                if publisher_matches:
+                                    publisher = publisher_matches[0][1].strip()
+                                
+                                # 중복 제거
+                                existing_titles = [book.title for book in book_data]
+                                if title not in existing_titles:
+                                    book_data.append(BookData(rank, title, author, publisher))
+                                break  # 첫 번째 매치만 사용
+                
+                elif matches2:
+                    # 패턴2로 찾은 경우 순위는 인덱스 기반으로 설정
+                    for i, match in enumerate(matches2):
+                        rank = i + 1
+                        title = match.strip()
+                        
+                        if len(title) > 3:  # 유효한 제목인지 확인
+                            # 저자와 출판사 정보 추출 시도
+                            author = "저자 정보 없음"
+                            publisher = "출판사 정보 없음"
+                            
+                            # 저자 패턴 찾기
+                            author_pattern = r'([가-힣\s]+?)\s*지음|([가-힣\s]+?)\s*저|([가-힣\s]+?)\s*편집'
+                            author_matches = re.findall(author_pattern, book_list_text)
+                            if author_matches:
+                                for author_match in author_matches:
+                                    if any(author_match):
+                                        author = next(a for a in author_match if a).strip()
+                                        break
+                            
+                            # 출판사 패턴 찾기 (저자 다음에 나오는 경우)
+                            publisher_pattern = r'([가-힣\s]+?)\s*\|\s*([가-힣\s]+?)\s*\|'
+                            publisher_matches = re.findall(publisher_pattern, book_list_text)
+                            if publisher_matches:
+                                publisher = publisher_matches[0][1].strip()
+                            
+                            # 중복 제거
+                            existing_titles = [book.title for book in book_data]
+                            if title not in existing_titles:
+                                book_data.append(BookData(rank, title, author, publisher))
+                            break  # 첫 번째 매치만 사용
             
-            if not book_items:
-                # 테이블 행에서 책 정보 찾기
-                table_rows = soup.find_all('tr')
-                for row in table_rows:
-                    # 책 제목이 포함된 셀 찾기
-                    cells = row.find_all(['td', 'th'])
-                    for cell in cells:
-                        cell_text = cell.get_text(strip=True)
-                        # 순위와 제목 패턴 찾기
-                        if re.match(r'^\d+$', cell_text) and len(cell_text) <= 3:
-                            # 다음 셀에서 제목 찾기
-                            next_cells = row.find_all(['td', 'th'])
-                            for next_cell in next_cells:
-                                title_text = next_cell.get_text(strip=True)
-                                if len(title_text) > 5 and not re.match(r'^\d+$', title_text):
-                                    rank = int(cell_text)
-                                    title = title_text
-                                    
-                                    # 저자와 출판사 정보 찾기
-                                    author = "저자 정보 없음"
-                                    publisher = "출판사 정보 없음"
-                                    
-                                    # 중복 제거
-                                    existing_titles = [book.title for book in book_data]
-                                    if title not in existing_titles:
-                                        book_data.append(BookData(rank, title, author, publisher))
-                                    break
-            
+            # 2. 책 상품 링크에서 제목 추출
             if not book_data:
-                # 전체 텍스트에서 패턴 매칭으로 데이터 추출 시도
+                book_links = soup.find_all('a', href=lambda x: x and 'wproduct.aspx' in x)
+                
+                for i, link in enumerate(book_links[:50]):
+                    link_text = link.get_text(strip=True)
+                    if len(link_text) > 5 and not link_text.startswith('http'):
+                        # 순위는 인덱스 기반으로 설정
+                        rank = i + 1
+                        title = link_text
+                        
+                        # 저자와 출판사는 기본값으로 설정
+                        author = "저자 정보 없음"
+                        publisher = "출판사 정보 없음"
+                        
+                        # 중복 제거
+                        existing_titles = [book.title for book in book_data]
+                        if title not in existing_titles:
+                            book_data.append(BookData(rank, title, author, publisher))
+            
+            # 3. 전체 텍스트에서 패턴 매칭으로 데이터 추출 시도
+            if not book_data:
                 all_text = soup.get_text()
                 
                 # 알라딘 베스트셀러 패턴으로 책 정보 추출 시도
                 patterns = [
+                    r'(\d+)\.\s*([가-힣\s]+?)(?:\s+지음|\s+저|\s+편집|\s+글|\s+그림|\s+외)',
                     r'(\d+)\s*([가-힣\s]+?)(?:\s+지음|\s+저|\s+편집|\s+글|\s+그림|\s+외)',
                     r'순위\s*(\d+)[^가-힣]*([가-힣\s]+?)(?:\s+지음|\s+저|\s+편집|\s+글|\s+그림|\s+외)',
-                    r'(\d+)\s*([가-힣\s]+?)(?:\s*[가-힣]+?\s*지음|\s*[가-힣]+?\s*저|\s*[가-힣]+?\s*편집)',
                 ]
                 
                 for pattern in patterns:
