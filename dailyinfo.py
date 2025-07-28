@@ -27,7 +27,6 @@ class Constants:
     MAX_CHART_ITEMS = 100  # 최대 차트 항목 수
     
     # URL
-    BUGS_CHART_URL = "https://music.bugs.co.kr/chart/track/realtime/total?wl_ref=M_contents_03_01"
     GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko"
     
     # HTTP 헤더
@@ -69,13 +68,6 @@ class Constants:
     # 한국 시간대
     KOREA_TZ = pytz.timezone('Asia/Seoul')
 
-class ChartRange(Enum):
-    """차트 표시 범위"""
-    TOP_10 = 10
-    TOP_20 = 20
-    TOP_50 = 50
-    TOP_100 = 100
-
 @dataclass
 class WeatherData:
     """날씨 데이터 클래스"""
@@ -97,92 +89,6 @@ class NewsData:
 class DataFetcher:
     """데이터 수집을 위한 클래스"""
     
-    @staticmethod
-    def get_bugs_chart() -> List[str]:
-        """벅스 차트 데이터 크롤링"""
-        try:
-            response = requests.get(
-                Constants.BUGS_CHART_URL, 
-                headers=Constants.DEFAULT_HEADERS, 
-                timeout=Constants.REQUEST_TIMEOUT
-            )
-            response.raise_for_status()
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            chart_data = DataFetcher._parse_bugs_chart(soup)
-            
-            if not chart_data:
-                st.error("벅스 차트 데이터를 파싱할 수 없습니다. 웹사이트 구조가 변경되었을 수 있습니다.")
-                return []
-            
-            return chart_data
-            
-        except requests.exceptions.RequestException as e:
-            st.error(f"벅스 차트 웹사이트에 접속할 수 없습니다: {e}")
-            return []
-        except Exception as e:
-            st.error(f"벅스 차트 데이터 수집 중 오류가 발생했습니다: {e}")
-            return []
-    
-    @staticmethod
-    def _parse_bugs_chart(soup: BeautifulSoup) -> List[str]:
-        """벅스 차트 HTML 파싱"""
-        chart_data = []
-        
-        # 차트 테이블 찾기
-        table = soup.find('table', class_='list')
-        
-        if not table:
-            st.warning("차트 테이블을 찾을 수 없습니다. 웹사이트 구조가 변경되었을 수 있습니다.")
-            return chart_data
-        
-        rows = table.find_all('tr')[1:]  # 헤더 제외
-        
-        for row in rows:
-            if len(chart_data) >= Constants.MAX_CHART_ITEMS:
-                break
-                
-            cells = row.find_all('td')
-            if len(cells) < 6:  # 최소 6개 셀이 필요
-                continue
-            
-            chart_item = DataFetcher._extract_chart_item(cells, row)
-            if chart_item:
-                chart_data.append(chart_item)
-        
-        return chart_data
-    
-    @staticmethod
-    def _extract_chart_item(cells: List, row) -> Optional[str]:
-        """차트 항목 추출"""
-        try:
-            # 순위 추출 (ranking div에서)
-            rank = "N/A"
-            ranking_div = row.find('div', class_='ranking')
-            if ranking_div:
-                strong_tag = ranking_div.find('strong')
-                if strong_tag:
-                    rank = strong_tag.get_text(strip=True)
-            
-            # 곡명 추출 (앨범 셀에서 - 6번째 셀)
-            song_title = cells[5].get_text(strip=True) if len(cells) > 5 else "N/A"
-            
-            # 아티스트 추출 (아티스트 링크에서)
-            artist_name = "N/A"
-            artist_link = row.find('a', href=re.compile(r'/artist/'))
-            if artist_link:
-                artist_name = artist_link.get_text(strip=True)
-            
-            if song_title and artist_name and song_title != "N/A" and artist_name != "N/A":
-                return f"{rank}. {artist_name} - {song_title}"
-            
-        except Exception:
-            pass
-        
-        return None
-    
-
-
     @staticmethod
     def get_weather_info(city_name: str = "서울") -> Optional[WeatherData]:
         """날씨 정보 수집"""
@@ -308,39 +214,6 @@ class DataProcessor:
     """데이터 처리 및 시각화 클래스"""
     
     @staticmethod
-    def create_chart_dataframe(data: List[str]) -> pd.DataFrame:
-        """차트 데이터를 DataFrame으로 변환"""
-        df_data = []
-        
-        for item in data:
-            chart_item = DataProcessor._parse_chart_item(item)
-            if chart_item:
-                df_data.append(chart_item)
-        
-        return pd.DataFrame(df_data)
-    
-    @staticmethod
-    def _parse_chart_item(item: str) -> Optional[Dict]:
-        """차트 항목 파싱"""
-        try:
-            if " - " not in item:
-                return None
-                
-            rank, song_info = item.split(". ", 1)
-            if " - " not in song_info:
-                return None
-                
-            artist, title = song_info.split(" - ", 1)
-            
-            return {
-                "순위": int(rank),
-                "아티스트": artist,
-                "곡명": title
-            }
-        except Exception:
-            return None
-
-    @staticmethod
     def create_weather_display(weather_data: WeatherData) -> None:
         """날씨 정보 표시"""
         st.subheader(f"🌤️ {weather_data.city} 날씨 정보")
@@ -447,12 +320,11 @@ class UIComponents:
             # 메뉴 선택
             menu = st.selectbox(
                 "메뉴 선택",
-                ["🏠 대시보드", "🎵 벅스 차트", "🌤️ 날씨 정보", "📰 뉴스", "⚙️ 설정"]
+                ["🏠 대시보드", "🌤️ 날씨 정보", "📰 뉴스", "⚙️ 설정"]
             )
             
             st.markdown("---")
             st.markdown("### 📡 데이터 출처")
-            st.markdown("- **벅스 차트**: 벅스 실시간 차트")
             st.markdown("- **날씨 정보**: OpenWeatherMap API")
             st.markdown("- **뉴스**: Google 뉴스 RSS")
             
@@ -472,103 +344,38 @@ class PageHandlers:
         st.caption("🕒 모든 시간은 한국 시간(UTC+9) 기준으로 표시됩니다.")
         
         # 메트릭 카드들
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.markdown("""
-            <div class="metric-card">
-                <h3>🎵 음악 차트</h3>
-                <p>벅스 실시간 차트 TOP 100</p>
-            </div>
-            """, unsafe_allow_html=True)
+        col1, col2, col3 = st.columns(3)
         
         # 날씨 정보
         weather_data = CacheManager.get_cached_data("weather_서울", DataFetcher.get_weather_info, "서울")
         if weather_data:
-            with col2:
+            with col1:
                 st.markdown(f"""
                 <div class="metric-card">
                     <h3>🌤️ {weather_data.city} 날씨</h3>
                     <p>{weather_data.temperature:.1f}°C, {weather_data.description}</p>
                 </div>
                 """, unsafe_allow_html=True)
-            
+        
+        # 뉴스 정보
+        news_data = CacheManager.get_cached_data("news", DataFetcher.get_news)
+        if news_data:
+            with col2:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3>📰 뉴스</h3>
+                    <p>최신 뉴스 {len(news_data)}개</p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # 업데이트 시간
         with col3:
             st.markdown("""
             <div class="metric-card">
-                <h3>📰 뉴스 정보</h3>
-                <p>Google 뉴스 실시간 헤드라인</p>
+                <h3>🕒 업데이트</h3>
+                <p>5분마다 자동 갱신</p>
             </div>
             """, unsafe_allow_html=True)
-        
-        # 최근 업데이트 정보
-        st.subheader("🕒 최근 업데이트 (한국 시간)")
-        if st.session_state.last_update:
-            for key, timestamp in st.session_state.last_update.items():
-                # UTC 타임스탬프를 한국 시간으로 변환
-                utc_time = datetime.utcfromtimestamp(timestamp)
-                utc_tz = pytz.UTC
-                utc_time = utc_tz.localize(utc_time)
-                korea_time = utc_time.astimezone(Constants.KOREA_TZ)
-                update_time = korea_time.strftime("%Y-%m-%d %H:%M:%S")
-                st.write(f"**{key}**: {update_time}")
-
-    @staticmethod
-    def show_bugs_chart():
-        """벅스 차트 페이지"""
-        st.header("🎵 벅스 일간 차트 TOP 100")
-        
-        # 데이터 출처 정보
-        st.info("📡 실시간 벅스 차트 데이터를 크롤링하여 제공합니다.")
-        
-        data = CacheManager.get_cached_data("bugs_chart", DataFetcher.get_bugs_chart)
-        
-        if data:
-            # 표시할 순위 범위 선택
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                display_range = st.selectbox(
-                    "표시할 순위 범위",
-                    ["TOP 10", "TOP 20", "TOP 50", "TOP 100"],
-                    index=0
-                )
-            
-            # 선택된 범위에 따라 데이터 필터링
-            range_map = {f"TOP {v.value}": v.value for v in ChartRange}
-            display_count = range_map[display_range]
-            filtered_data = data[:display_count]
-            
-            # 데이터프레임으로 변환하여 표시
-            df = DataProcessor.create_chart_dataframe(filtered_data)
-            
-            if not df.empty:
-                # 데이터 테이블 표시
-                st.subheader(f"📋 {display_range} 차트")
-                st.dataframe(df, use_container_width=True, hide_index=True)
-                
-                # 차트 시각화
-                st.subheader("📊 차트 시각화")
-                fig = px.bar(df, x="곡명", y="순위", 
-                            title=f"벅스 차트 {display_range}",
-                            color="아티스트",
-                            height=600)
-                fig.update_layout(
-                    xaxis_tickangle=-45,
-                    showlegend=True
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # 아티스트별 통계
-                st.subheader("🎤 아티스트별 통계")
-                artist_stats = df['아티스트'].value_counts()
-                fig_pie = px.pie(
-                    values=artist_stats.values, 
-                    names=artist_stats.index,
-                    title="아티스트별 TOP 100 진입 곡 수"
-                )
-                st.plotly_chart(fig_pie, use_container_width=True)
-            else:
-                st.write("데이터를 표시할 수 없습니다.")
 
     @staticmethod
     def show_weather_info():
@@ -723,7 +530,6 @@ def main():
     # 메뉴별 처리
     menu_handlers = {
         "🏠 대시보드": PageHandlers.show_dashboard_overview,
-        "🎵 벅스 차트": PageHandlers.show_bugs_chart,
         "🌤️ 날씨 정보": PageHandlers.show_weather_info,
         "📰 뉴스": PageHandlers.show_news,
         "⚙️ 설정": PageHandlers.show_settings
