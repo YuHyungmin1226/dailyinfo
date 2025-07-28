@@ -267,7 +267,7 @@ class DataFetcher:
         """학교 목록 조회"""
         try:
             params = {
-                'KEY': st.secrets.get("NEIS_API_KEY", ""),
+                'KEY': 'c4ef97602ca54adc9e4cd49648b247f6',  # 테스트용 API 키
                 'Type': 'json',
                 'ATPT_OFCDC_SC_CODE': region_code
             }
@@ -308,7 +308,7 @@ class DataFetcher:
         """급식 정보 조회"""
         try:
             params = {
-                'KEY': st.secrets.get("NEIS_API_KEY", ""),
+                'KEY': 'c4ef97602ca54adc9e4cd49648b247f6',  # 테스트용 API 키
                 'Type': 'json',
                 'ATPT_OFCDC_SC_CODE': 'B10',  # 임시로 서울 사용
                 'SD_SCHUL_CODE': school_code,
@@ -319,6 +319,12 @@ class DataFetcher:
             response.raise_for_status()
             
             data = response.json()
+            
+            # RESULT 키가 있으면 데이터가 없는 경우
+            if 'RESULT' in data:
+                result = data['RESULT']
+                if result.get('CODE') == 'INFO-200':
+                    return []  # 데이터가 없음 (방학, 주말, 공휴일 등)
             
             if 'mealServiceDietInfo' not in data:
                 return []
@@ -354,7 +360,7 @@ class DataFetcher:
                 api_url = Constants.NEIS_ELS_TIMETABLE
             
             params = {
-                'KEY': st.secrets.get("NEIS_API_KEY", ""),
+                'KEY': 'c4ef97602ca54adc9e4cd49648b247f6',  # 테스트용 API 키
                 'Type': 'json',
                 'ATPT_OFCDC_SC_CODE': 'B10',  # 임시로 서울 사용
                 'SD_SCHUL_CODE': school_code,
@@ -368,6 +374,12 @@ class DataFetcher:
             response.raise_for_status()
             
             data = response.json()
+            
+            # RESULT 키가 있으면 데이터가 없는 경우
+            if 'RESULT' in data:
+                result = data['RESULT']
+                if result.get('CODE') == 'INFO-200':
+                    return []  # 데이터가 없음 (방학, 주말, 공휴일 등)
             
             if 'hisTimetable' not in data and 'misTimetable' not in data and 'elsTimetable' not in data:
                 return []
@@ -783,7 +795,8 @@ class PageHandlers:
                                         </div>
                                         """, unsafe_allow_html=True)
                             else:
-                                st.info("해당 기간의 급식 정보가 없습니다.")
+                                st.warning("🍽️ 해당 기간의 급식 정보가 없습니다.")
+                                st.info("💡 방학, 주말, 공휴일에는 급식 정보가 제공되지 않습니다.")
                         
                         with tab2:
                             st.subheader("📚 시간표 정보")
@@ -814,7 +827,8 @@ class PageHandlers:
                                         </div>
                                         """, unsafe_allow_html=True)
                             else:
-                                st.info("해당 기간의 시간표 정보가 없습니다.")
+                                st.warning("📚 해당 기간의 시간표 정보가 없습니다.")
+                                st.info("💡 방학, 주말, 공휴일에는 시간표 정보가 제공되지 않습니다.")
             else:
                 st.warning("해당 지역에서 학교를 찾을 수 없습니다.")
         else:
