@@ -345,7 +345,7 @@ class DataProcessor:
         """날씨 정보 표시"""
         st.subheader(f"🌤️ {weather_data.city} 날씨 정보")
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.metric("🌡️ 기온", f"{weather_data.temperature:.1f}°C")
@@ -356,18 +356,15 @@ class DataProcessor:
         with col3:
             st.metric("💨 풍속", f"{weather_data.wind_speed:.1f} m/s")
         
-        # 날씨 설명과 바람 방향을 함께 표시
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.info(f"📝 날씨 상태: {weather_data.description}")
-        
-        with col2:
+        with col4:
             # 바람 방향
             directions = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"]
             direction_index = int((weather_data.wind_direction + 22.5) / 45) % 8
             wind_direction = directions[direction_index]
-            st.info(f"🧭 바람 방향: {wind_direction} ({weather_data.wind_direction}°)")
+            st.metric("🧭 풍향", f"{wind_direction}")
+        
+        # 날씨 설명
+        st.info(f"📝 날씨 상태: {weather_data.description}")
 
 class CacheManager:
     """캐시 관리 클래스"""
