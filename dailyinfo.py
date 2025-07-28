@@ -253,10 +253,14 @@ class DataFetcher:
     def get_weather_info() -> Optional[WeatherData]:
         """날씨 정보 수집"""
         try:
+            # Streamlit secrets에서 먼저 시도, 없으면 환경 변수에서 시도
             weather_api_key = st.secrets.get("WEATHER_API_KEY", "")
+            if not weather_api_key:
+                import os
+                weather_api_key = os.environ.get("WEATHER_API_KEY", "")
             
             if not weather_api_key or weather_api_key == "your_api_key_here":
-                st.error("OpenWeatherMap API 키가 설정되지 않았습니다. .streamlit/secrets.toml 파일에 API 키를 설정해주세요.")
+                st.error("OpenWeatherMap API 키가 설정되지 않았습니다. Streamlit Cloud의 Settings > Secrets에서 WEATHER_API_KEY를 설정해주세요.")
                 return None
             
             url = f"https://api.openweathermap.org/data/2.5/weather"

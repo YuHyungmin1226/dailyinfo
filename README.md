@@ -78,12 +78,21 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. 환경 변수 설정 (선택사항)
+### 4. API 키 설정
+
+#### 로컬 실행 시
 날씨 API를 사용하려면 OpenWeatherMap API 키가 필요합니다:
 
 ```bash
 # .streamlit/secrets.toml 파일 생성
-[secrets]
+WEATHER_API_KEY = "your_openweathermap_api_key_here"
+```
+
+#### Streamlit Cloud 배포 시
+1. [share.streamlit.io](https://share.streamlit.io)에 로그인
+2. 프로젝트 선택 → Settings 탭
+3. Secrets 섹션에 다음 내용 입력:
+```toml
 WEATHER_API_KEY = "your_openweathermap_api_key_here"
 ```
 
