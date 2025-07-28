@@ -557,7 +557,7 @@ class PageHandlers:
         st.header("📊 대시보드 개요")
         
         # 메트릭 카드들
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.markdown("""
@@ -582,6 +582,14 @@ class PageHandlers:
                 <p>서울 실시간 날씨</p>
             </div>
             """, unsafe_allow_html=True)
+            
+        with col4:
+            st.markdown("""
+            <div class="metric-card">
+                <h3>📰 뉴스 정보</h3>
+                <p>Google 뉴스 실시간 헤드라인</p>
+            </div>
+            """, unsafe_allow_html=True)
         
         # 최근 업데이트 정보
         st.subheader("🕒 최근 업데이트")
@@ -589,6 +597,28 @@ class PageHandlers:
             for key, timestamp in st.session_state.last_update.items():
                 update_time = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
                 st.write(f"**{key}**: {update_time}")
+        
+        # 최신 뉴스 미리보기
+        st.subheader("📰 최신 뉴스 미리보기")
+        news_data = CacheManager.get_cached_data("news", DataFetcher.get_news)
+        
+        if news_data:
+            # 상위 5개 뉴스만 표시
+            for i, news in enumerate(news_data[:5], 1):
+                st.markdown(f"""
+                <div style="
+                    border-left: 4px solid #3b82f6;
+                    padding-left: 12px;
+                    margin: 8px 0;
+                ">
+                    <p style="margin: 4px 0; font-weight: 500;">{i}. {news.title}</p>
+                    <p style="margin: 2px 0; font-size: 12px; color: #6b7280;">
+                        📰 {news.source} | 📅 {news.published}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("뉴스 데이터를 불러오는 중입니다...")
 
     @staticmethod
     def show_bugs_chart():
