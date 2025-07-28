@@ -462,7 +462,7 @@ class PageHandlers:
             if not df.empty:
                 # 데이터 테이블 표시
                 st.subheader(f"📋 {display_range} 차트")
-                st.dataframe(df, use_container_width=True)
+                st.dataframe(df, use_container_width=True, hide_index=True)
                 
                 # 차트 시각화
                 st.subheader("📊 차트 시각화")
@@ -502,7 +502,7 @@ class PageHandlers:
                 for book in data
             ]
             df = pd.DataFrame(book_dicts)
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, use_container_width=True, hide_index=True)
             
             # 출판사별 통계
             publisher_stats = df['publisher'].value_counts()
