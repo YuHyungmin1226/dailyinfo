@@ -29,6 +29,7 @@ class Constants:
     # URL
     BUGS_CHART_URL = "https://music.bugs.co.kr/chart/track/realtime/total?wl_ref=M_contents_03_01"
     GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko"
+    ALADIN_BESTSELLER_URL = "https://www.aladin.co.kr/shop/common/wbest.aspx?BestType=NowBest&BranchType=2&CID=0&page={}&cnt=100&SortOrder=1"
     
     # HTTP 헤더
     DEFAULT_HEADERS = {
@@ -170,18 +171,18 @@ class DataFetcher:
 
     @staticmethod
     def get_book_rankings() -> List[BookData]:
-        """교보문고 실시간 베스트셀러 데이터 (100개)"""
+        """알라딘 실시간 베스트셀러 데이터 (100개)"""
         try:
             book_data = []
             
             # 두 페이지에서 각각 50개씩 가져오기
             for page in [1, 2]:
-                url = f"https://store.kyobobook.co.kr/bestseller/realtime?page={page}&per=50"
+                url = Constants.ALADIN_BESTSELLER_URL.format(page)
                 response = requests.get(url, headers=Constants.DEFAULT_HEADERS, timeout=Constants.REQUEST_TIMEOUT)
                 response.raise_for_status()
                 
                 soup = BeautifulSoup(response.content, 'html.parser')
-                page_data = DataFetcher._parse_kyobo_chart(soup, page)
+                page_data = DataFetcher._parse_aladin_chart(soup, page)
                 
                 # 두 번째 페이지 데이터의 순위를 51-100으로 조정
                 if page == 2:
@@ -193,31 +194,73 @@ class DataFetcher:
             return book_data
             
         except requests.exceptions.RequestException as e:
-            st.error(f"교보문고 웹사이트에 접속할 수 없습니다: {e}")
+            st.error(f"알라딘 웹사이트에 접속할 수 없습니다: {e}")
             return []
         except Exception as e:
             st.error(f"도서 순위 데이터 수집 중 오류가 발생했습니다: {e}")
             return []
     
     @staticmethod
-    def _parse_kyobo_chart(soup: BeautifulSoup, page: int = 1) -> List[BookData]:
-        """교보문고 베스트셀러 HTML 파싱"""
+    def _parse_aladin_chart(soup: BeautifulSoup, page: int = 1) -> List[BookData]:
+        """알라딘 베스트셀러 HTML 파싱"""
         book_data = []
         
         try:
-            # 실제 크롤링 시도
-            # HTML에서 책 정보 추출 시도
-            book_items = soup.find_all(['div', 'li'], class_=lambda x: x and any(keyword in x.lower() for keyword in ['prod', 'book', 'item', 'bestseller']))
+            # 알라딘 베스트셀러 테이블에서 책 정보 추출
+            # 여러 가능한 선택자 시도
+            selectors = [
+                'tr.ss_book_box',
+                'tr[class*="ss_book"]',
+                'tr[class*="book"]',
+                'div.ss_book_box',
+                'div[class*="ss_book"]',
+                'li.ss_book_box',
+                'li[class*="ss_book"]'
+            ]
+            
+            book_items = []
+            for selector in selectors:
+                book_items = soup.select(selector)
+                if book_items:
+                    break
             
             if not book_items:
+                # 테이블 행에서 책 정보 찾기
+                table_rows = soup.find_all('tr')
+                for row in table_rows:
+                    # 책 제목이 포함된 셀 찾기
+                    cells = row.find_all(['td', 'th'])
+                    for cell in cells:
+                        cell_text = cell.get_text(strip=True)
+                        # 순위와 제목 패턴 찾기
+                        if re.match(r'^\d+$', cell_text) and len(cell_text) <= 3:
+                            # 다음 셀에서 제목 찾기
+                            next_cells = row.find_all(['td', 'th'])
+                            for next_cell in next_cells:
+                                title_text = next_cell.get_text(strip=True)
+                                if len(title_text) > 5 and not re.match(r'^\d+$', title_text):
+                                    rank = int(cell_text)
+                                    title = title_text
+                                    
+                                    # 저자와 출판사 정보 찾기
+                                    author = "저자 정보 없음"
+                                    publisher = "출판사 정보 없음"
+                                    
+                                    # 중복 제거
+                                    existing_titles = [book.title for book in book_data]
+                                    if title not in existing_titles:
+                                        book_data.append(BookData(rank, title, author, publisher))
+                                    break
+            
+            if not book_data:
                 # 전체 텍스트에서 패턴 매칭으로 데이터 추출 시도
                 all_text = soup.get_text()
                 
-                # 다양한 패턴으로 책 정보 추출 시도
+                # 알라딘 베스트셀러 패턴으로 책 정보 추출 시도
                 patterns = [
-                    r'(\d+)\.\s*([가-힣\s]+?)(?:\s+외|\s+지음|\s+저|\s+편집|\s+글|\s+그림)',
-                    r'(\d+)\s+([가-힣\s]+?)(?:\s+외|\s+지음|\s+저|\s+편집|\s+글|\s+그림)',
-                    r'순위\s*(\d+)[^가-힣]*([가-힣\s]+?)(?:\s+외|\s+지음|\s+저|\s+편집|\s+글|\s+그림)',
+                    r'(\d+)\s*([가-힣\s]+?)(?:\s+지음|\s+저|\s+편집|\s+글|\s+그림|\s+외)',
+                    r'순위\s*(\d+)[^가-힣]*([가-힣\s]+?)(?:\s+지음|\s+저|\s+편집|\s+글|\s+그림|\s+외)',
+                    r'(\d+)\s*([가-힣\s]+?)(?:\s*[가-힣]+?\s*지음|\s*[가-힣]+?\s*저|\s*[가-힣]+?\s*편집)',
                 ]
                 
                 for pattern in patterns:
@@ -251,7 +294,7 @@ class DataFetcher:
             return []
             
         except Exception as e:
-            st.error(f"교보문고 차트 파싱 중 오류: {e}")
+            st.error(f"알라딘 차트 파싱 중 오류: {e}")
             return []
 
     @staticmethod
@@ -628,10 +671,10 @@ class PageHandlers:
     @staticmethod
     def show_book_rankings():
         """도서 순위 페이지"""
-        st.header("📚 교보문고 베스트셀러 TOP 100")
+        st.header("📚 알라딘 베스트셀러 TOP 100")
         
         # 데이터 출처 정보
-        st.info("📡 교보문고 베스트셀러 데이터를 실시간으로 크롤링하여 제공합니다.")
+        st.info("📡 알라딘 베스트셀러 데이터를 실시간으로 크롤링하여 제공합니다.")
         
         data = CacheManager.get_cached_data("book_rankings", DataFetcher.get_book_rankings)
         
@@ -680,7 +723,7 @@ class PageHandlers:
                 # 차트 시각화
                 st.subheader("📊 차트 시각화")
                 fig = px.bar(df, x="title", y="rank", 
-                            title=f"교보문고 베스트셀러 {display_range}",
+                            title=f"알라딘 베스트셀러 {display_range}",
                             color="publisher",
                             height=600)
                 fig.update_layout(
@@ -712,9 +755,6 @@ class PageHandlers:
                 st.plotly_chart(fig_author, use_container_width=True)
             else:
                 st.write("데이터를 표시할 수 없습니다.")
-        else:
-            st.error("❌ 도서 순위 데이터를 가져올 수 없습니다. 잠시 후 다시 시도해주세요.")
-            st.info("💡 교보문고 웹사이트 구조 변경으로 인해 크롤링이 어려울 수 있습니다.")
 
     @staticmethod
     def show_weather_info():
