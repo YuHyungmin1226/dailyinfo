@@ -306,13 +306,13 @@ class DataFetcher:
             return []
 
     @staticmethod
-    def get_meals(school_code: str, date: str) -> List[MealData]:
+    def get_meals(school_code: str, date: str, region_code: str = 'B10') -> List[MealData]:
         """급식 정보 조회"""
         try:
             params = {
                 'KEY': 'c4ef97602ca54adc9e4cd49648b247f6',  # 테스트용 API 키
                 'Type': 'json',
-                'ATPT_OFCDC_SC_CODE': 'B10',  # 임시로 서울 사용
+                'ATPT_OFCDC_SC_CODE': region_code,  # 선택된 지역의 교육청 코드 사용
                 'SD_SCHUL_CODE': school_code,
                 'MLSV_YMD': date
             }
@@ -349,11 +349,10 @@ class DataFetcher:
             return []
 
     @staticmethod
-    def get_timetable(school_code: str, grade: str, class_num: str, date: str) -> List[TimetableData]:
+    def get_timetable(school_code: str, grade: str, class_num: str, date: str, region_code: str = 'B10', school_level: str = "고등학교") -> List[TimetableData]:
         """시간표 정보 조회"""
         try:
             # 학교 종류에 따라 다른 API 사용
-            school_level = "고등학교"  # 임시로 고등학교 사용
             api_url = Constants.NEIS_HIS_TIMETABLE
             
             if school_level == "중학교":
@@ -364,7 +363,7 @@ class DataFetcher:
             params = {
                 'KEY': 'c4ef97602ca54adc9e4cd49648b247f6',  # 테스트용 API 키
                 'Type': 'json',
-                'ATPT_OFCDC_SC_CODE': 'B10',  # 임시로 서울 사용
+                'ATPT_OFCDC_SC_CODE': region_code,  # 선택된 지역의 교육청 코드 사용
                 'SD_SCHUL_CODE': school_code,
                 'GRADE': grade,
                 'CLASS_NM': class_num,
@@ -790,7 +789,7 @@ class PageHandlers:
                                 date_str = current_date.strftime('%Y%m%d')
                                 day_name = current_date.strftime('%A')  # 요일
                                 
-                                daily_meals = DataFetcher.get_meals(selected_school.school_code, date_str)
+                                daily_meals = DataFetcher.get_meals(selected_school.school_code, date_str, region_code)
                                 if daily_meals:
                                     for meal in daily_meals:
                                         meal.date = date_str
@@ -841,7 +840,9 @@ class PageHandlers:
                                     selected_school.school_code, 
                                     grade, 
                                     class_num, 
-                                    date_str
+                                    date_str,
+                                    region_code,
+                                    selected_school.school_level
                                 )
                                 if daily_timetable:
                                     for item in daily_timetable:
