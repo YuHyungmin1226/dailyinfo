@@ -93,13 +93,13 @@ class DataFetcher:
             
             if not chart_data:
                 st.error("데이터 불러오기에 실패하였습니다. 잠시 후에 다시 시도하세요.")
-                return DataFetcher._get_mock_bugs_chart()
+                return []
             
             return chart_data
             
         except Exception as e:
             st.error("데이터 불러오기에 실패하였습니다. 잠시 후에 다시 시도하세요.")
-            return DataFetcher._get_mock_bugs_chart()
+            return []
     
     @staticmethod
     def _parse_bugs_chart(soup: BeautifulSoup) -> List[str]:
@@ -155,41 +155,23 @@ class DataFetcher:
         
         return None
     
-    @staticmethod
-    def _get_mock_bugs_chart() -> List[str]:
-        """Mock 벅스 차트 데이터"""
-        return [
-            "1. NewJeans - Ditto", "2. IVE - After LIKE", "3. LE SSERAFIM - ANTIFRAGILE",
-            "4. aespa - Girls", "5. BLACKPINK - Pink Venom", "6. NewJeans - Hype Boy",
-            "7. IVE - Love Dive", "8. LE SSERAFIM - FEARLESS", "9. aespa - Next Level",
-            "10. BLACKPINK - How You Like That", "11. NewJeans - Attention",
-            "12. IVE - Eleven", "13. LE SSERAFIM - Blue Flame", "14. aespa - Savage",
-            "15. BLACKPINK - Lovesick Girls", "16. NewJeans - Cookie",
-            "17. IVE - Take It", "18. LE SSERAFIM - The Great Mermaid",
-            "19. aespa - Dreams Come True", "20. BLACKPINK - Ice Cream"
-        ] + [f"{i}. Mock Artist - Mock Song {i}" for i in range(21, 101)]
+
 
     @staticmethod
     def get_book_rankings() -> List[BookData]:
         """도서 순위 데이터"""
-        try:
-            mock_data = [
-                BookData(1, "어떻게 하면 좋을까요?", "김철수", "행복출판사"),
-                BookData(2, "성공하는 방법", "이영희", "성공출판사"),
-                BookData(3, "프로그래밍 기초", "박개발", "코딩출판사"),
-                BookData(4, "요리 레시피", "최요리", "맛있는출판사"),
-                BookData(5, "여행 가이드", "정여행", "여행출판사")
-            ]
-            return mock_data
-        except Exception as e:
-            st.error(f"도서 순위 데이터 수집 실패: {e}")
-            return []
+        st.error("도서 순위 데이터를 불러올 수 없습니다.")
+        return []
 
     @staticmethod
     def get_weather_info() -> Optional[WeatherData]:
         """날씨 정보 수집"""
         try:
             weather_api_key = st.secrets.get("WEATHER_API_KEY", "your_api_key_here")
+            
+            if weather_api_key == "your_api_key_here":
+                st.error("OpenWeatherMap API 키가 설정되지 않았습니다.")
+                return None
             
             url = f"https://api.openweathermap.org/data/2.5/weather"
             params = {
@@ -212,41 +194,18 @@ class DataFetcher:
                     wind_direction=data["wind"]["deg"]
                 )
             else:
-                # Mock 데이터 반환
-                return WeatherData(22, 65, "맑음", 3.2, 180)
+                st.error("날씨 정보를 불러올 수 없습니다.")
+                return None
                 
         except Exception as e:
-            st.error(f"날씨 정보 수집 실패: {e}")
+            st.error("날씨 정보를 불러올 수 없습니다.")
             return None
 
     @staticmethod
     def get_news() -> List[NewsData]:
         """뉴스 데이터"""
-        try:
-            mock_data = [
-                NewsData(
-                    "AI 기술 발전으로 새로운 가능성 열려",
-                    "https://example.com/news1",
-                    "테크뉴스",
-                    "2024-01-15"
-                ),
-                NewsData(
-                    "환경 보호를 위한 새로운 정책 발표",
-                    "https://example.com/news2",
-                    "환경일보",
-                    "2024-01-15"
-                ),
-                NewsData(
-                    "경제 회복 신호 포착",
-                    "https://example.com/news3",
-                    "경제신문",
-                    "2024-01-15"
-                )
-            ]
-            return mock_data
-        except Exception as e:
-            st.error(f"뉴스 데이터 수집 실패: {e}")
-            return []
+        st.error("뉴스 데이터를 불러올 수 없습니다.")
+        return []
 
 class DataProcessor:
     """데이터 처리 및 시각화 클래스"""
