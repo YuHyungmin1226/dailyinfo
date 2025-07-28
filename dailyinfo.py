@@ -29,7 +29,6 @@ class Constants:
     # URL
     BUGS_CHART_URL = "https://music.bugs.co.kr/chart/track/realtime/total?wl_ref=M_contents_03_01"
     GOOGLE_NEWS_RSS_URL = "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko"
-    ALADIN_BESTSELLER_URL = "https://www.aladin.co.kr/shop/common/wbest.aspx?BestType=NowBest&BranchType=2&CID=0&page={}&cnt=100&SortOrder=1"
     
     # HTTP 헤더
     DEFAULT_HEADERS = {
@@ -71,14 +70,6 @@ class NewsData:
     link: str
     source: str
     published: str
-
-@dataclass
-class BookData:
-    """도서 데이터 클래스"""
-    rank: int
-    title: str
-    author: str
-    publisher: str
 
 class DataFetcher:
     """데이터 수집을 위한 클래스"""
@@ -168,159 +159,6 @@ class DataFetcher:
         return None
     
 
-
-    @staticmethod
-    def get_book_rankings() -> List[BookData]:
-        """알라딘 실시간 베스트셀러 데이터 (100개)"""
-        try:
-            book_data = []
-            
-            # 두 페이지에서 각각 50개씩 가져오기
-            for page in [1, 2]:
-                url = Constants.ALADIN_BESTSELLER_URL.format(page)
-                response = requests.get(url, headers=Constants.DEFAULT_HEADERS, timeout=Constants.REQUEST_TIMEOUT)
-                response.raise_for_status()
-                
-                soup = BeautifulSoup(response.content, 'html.parser')
-                page_data = DataFetcher._parse_aladin_chart(soup, page)
-                
-                # 두 번째 페이지 데이터의 순위를 51-100으로 조정
-                if page == 2:
-                    for book in page_data:
-                        book.rank = book.rank + 50
-                
-                book_data.extend(page_data)
-            
-            return book_data
-            
-        except requests.exceptions.RequestException as e:
-            st.error(f"알라딘 웹사이트에 접속할 수 없습니다: {e}")
-            return []
-        except Exception as e:
-            st.error(f"도서 순위 데이터 수집 중 오류가 발생했습니다: {e}")
-            return []
-    
-    @staticmethod
-    def _parse_aladin_chart(soup: BeautifulSoup, page: int = 1) -> List[BookData]:
-        """알라딘 베스트셀러 HTML 파싱 (개선된 버전)"""
-        book_data = []
-        
-        try:
-            # 1. ss_book_list 클래스를 가진 요소들에서 책 정보 추출
-            book_lists = soup.find_all('div', class_='ss_book_list')
-            
-            if book_lists:
-                valid_count = 0  # 유효한 책 개수 카운터
-                for book_list in book_lists:
-                    book_list_text = book_list.get_text(strip=True)
-                    
-                    # [국내도서]가 포함된 요소만 분석
-                    if '[국내도서]' not in book_list_text:
-                        continue
-                    
-                    # 순위 계산 (페이지별로 정확하게)
-                    rank = (page - 1) * 50 + valid_count + 1
-                    valid_count += 1
-                    
-                    # 제목 추출 (개선된 방식)
-                    title = ""
-                    author = "저자 정보 없음"
-                    publisher = "출판사 정보 없음"
-                    
-                    # 1단계: [국내도서] 다음부터 (지은이) 이전까지 추출
-                    if '[국내도서]' in book_list_text and '(지은이)' in book_list_text:
-                        start_idx = book_list_text.find('[국내도서]') + len('[국내도서]')
-                        end_idx = book_list_text.find('(지은이)')
-                        
-                        if start_idx < end_idx:
-                            title = book_list_text[start_idx:end_idx].strip()
-                            
-                            # 2단계: 저자명 추출 (완전히 개선된 방식)
-                            author_pattern = r'([가-힣\s]+?)\s*\(지은이\)'
-                            author_matches = re.findall(author_pattern, book_list_text)
-                            
-                            if author_matches:
-                                # 가장 긴 저자명 선택 (2글자 이상, 20글자 이하)
-                                valid_authors = [auth for auth in author_matches if 2 <= len(auth.strip()) <= 20]
-                                if valid_authors:
-                                    author = max(valid_authors, key=lambda x: len(x)).strip()
-                                    
-                                    # 3단계: 제목에서 저자명 완전 제거 (더 정교한 방식)
-                                    if author in title:
-                                        # 저자명이 제목 끝에 있는 경우 제거
-                                        if title.endswith(author):
-                                            title = title[:-len(author)].strip()
-                                        elif title.endswith(author + ' '):
-                                            title = title[:-len(author + ' ')].strip()
-                                        elif title.endswith(author + ','):
-                                            title = title[:-len(author + ',')].strip()
-                                        elif title.endswith(author + ')'):
-                                            title = title[:-len(author + ')')].strip()
-                                    
-                                    # 불필요한 구두점 제거
-                                    title = re.sub(r'\s*[-,\s]+\s*$', '', title)
-                                
-                                # 추가: 제목에서 저자명 패턴 제거
-                                # 저자명이 제목 중간에 포함된 경우도 제거
-                                title = re.sub(rf'\s*{re.escape(author)}\s*', ' ', title)
-                                title = re.sub(r'\s+', ' ', title)  # 연속된 공백 제거
-                                title = title.strip()
-                        
-                        # 4단계: 출판사 추출 (완전히 개선된 방식)
-                        # 패턴 1: (지은이) |출판사명| 패턴
-                        publisher_pattern1 = r'\(지은이\)\s*\|\s*([가-힣\s]+?)\s*\|'
-                        publisher_matches1 = re.findall(publisher_pattern1, book_list_text)
-                        
-                        # 패턴 2: |저자명|출판사명| 패턴
-                        publisher_pattern2 = r'([가-힣\s]+?)\s*\|\s*([가-힣\s]+?)\s*\|'
-                        publisher_matches2 = re.findall(publisher_pattern2, book_list_text)
-                        
-                        # 패턴 3: 출판사 키워드로 찾기
-                        publisher_pattern3 = r'([가-힣\s]+?)\s*출판사|([가-힣\s]+?)\s*사\s*\|'
-                        publisher_matches3 = re.findall(publisher_pattern3, book_list_text)
-                        
-                        if publisher_matches1:
-                            publisher = publisher_matches1[0].strip()
-                        elif publisher_matches2:
-                            publisher = publisher_matches2[0][1].strip()
-                        elif publisher_matches3:
-                            # 가장 긴 출판사명 선택
-                            valid_publishers = [pub for pub in publisher_matches3 if any(pub)]
-                            if valid_publishers:
-                                longest_publisher = max(valid_publishers, key=lambda x: len(x[0]) if x[0] else 0)
-                                publisher = longest_publisher[0].strip() if longest_publisher[0] else longest_publisher[1].strip()
-                        
-                        # 5단계: 제목 정리 (기본 정리만)
-                        # 제목에서 연속된 공백만 제거
-                        title = re.sub(r'\s+', ' ', title)  # 연속된 공백 제거
-                        title = title.strip()
-                        
-                        # 제목이 너무 길면 적절히 자르기
-                        if len(title) > 80:
-                            title = title[:80] + "..."
-                        
-                        # 유효한 제목인지 확인
-                        if len(title) > 3 and title:
-                            # 중복 제거
-                            existing_titles = [book.title for book in book_data]
-                            if title not in existing_titles:
-                                book_data.append(BookData(rank, title, author, publisher))
-            
-            # 순위별로 정렬
-            book_data.sort(key=lambda x: x.rank)
-            
-            # 성공적으로 데이터를 파싱한 경우 세션에 저장
-            if book_data:
-                st.session_state.last_successful_book_data = book_data.copy()
-                st.session_state.last_successful_book_update = time.time()
-                return book_data
-            
-            # 파싱 실패 시 빈 리스트 반환
-            return []
-            
-        except Exception as e:
-            st.error(f"알라딘 차트 파싱 중 오류: {e}")
-            return []
 
     @staticmethod
     def get_weather_info() -> Optional[WeatherData]:
@@ -558,27 +396,31 @@ class UIComponents:
             st.session_state.data_cache = {}
         if 'last_update' not in st.session_state:
             st.session_state.last_update = {}
-        if 'last_successful_book_data' not in st.session_state:
-            st.session_state.last_successful_book_data = []
-        if 'last_successful_book_update' not in st.session_state:
-            st.session_state.last_successful_book_update = None
     
     @staticmethod
     def create_sidebar() -> str:
         """사이드바 생성"""
-        st.sidebar.title("📋 메뉴")
-        menu = st.sidebar.selectbox(
-            "보고 싶은 정보를 선택하세요",
-            [
-                "🏠 대시보드 개요",
-                "🎵 벅스 일간 차트", 
-                "📚 도서 순위",
-                "🌤️ 날씨 정보",
-                "📰 뉴스",
-                "⚙️ 설정"
-            ]
-        )
-        return menu
+        with st.sidebar:
+            st.title("📊 DailyInfo")
+            st.markdown("---")
+            
+            # 메뉴 선택
+            menu = st.selectbox(
+                "메뉴 선택",
+                ["🏠 대시보드", "🎵 벅스 차트", "🌤️ 날씨 정보", "📰 뉴스", "⚙️ 설정"]
+            )
+            
+            st.markdown("---")
+            st.markdown("### 📡 데이터 출처")
+            st.markdown("- **벅스 차트**: 벅스 실시간 차트")
+            st.markdown("- **날씨 정보**: OpenWeatherMap API")
+            st.markdown("- **뉴스**: Google 뉴스 RSS")
+            
+            st.markdown("---")
+            st.markdown("### 🔄 업데이트 주기")
+            st.markdown("모든 데이터는 **5분마다** 자동으로 갱신됩니다.")
+            
+            return menu
 
 class PageHandlers:
     """페이지 핸들러 클래스"""
@@ -603,20 +445,12 @@ class PageHandlers:
         with col2:
             st.markdown("""
             <div class="metric-card">
-                <h3>📚 도서 정보</h3>
-                <p>베스트셀러 순위</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown("""
-            <div class="metric-card">
                 <h3>🌤️ 날씨 정보</h3>
                 <p>서울 실시간 날씨</p>
             </div>
             """, unsafe_allow_html=True)
             
-        with col4:
+        with col3:
             st.markdown("""
             <div class="metric-card">
                 <h3>📰 뉴스 정보</h3>
@@ -690,94 +524,6 @@ class PageHandlers:
                     title="아티스트별 TOP 100 진입 곡 수"
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
-            else:
-                st.write("데이터를 표시할 수 없습니다.")
-
-    @staticmethod
-    def show_book_rankings():
-        """도서 순위 페이지"""
-        st.header("📚 알라딘 베스트셀러 TOP 100")
-        
-        # 데이터 출처 정보
-        st.info("📡 알라딘 베스트셀러 데이터를 실시간으로 크롤링하여 제공합니다.")
-        
-        data = CacheManager.get_cached_data("book_rankings", DataFetcher.get_book_rankings)
-        
-        # 실시간 데이터가 없고 최근 성공한 데이터가 있는 경우
-        if not data and st.session_state.last_successful_book_data:
-            st.warning("⚠️ 실시간 데이터를 가져올 수 없어 최근에 성공한 데이터를 표시합니다.")
-            
-            # 최근 성공한 데이터의 업데이트 시간 표시
-            if st.session_state.last_successful_book_update:
-                utc_time = datetime.utcfromtimestamp(st.session_state.last_successful_book_update)
-                utc_tz = pytz.UTC
-                utc_time = utc_tz.localize(utc_time)
-                korea_time = utc_time.astimezone(Constants.KOREA_TZ)
-                update_time = korea_time.strftime("%Y-%m-%d %H:%M:%S")
-                st.caption(f"📅 마지막 성공한 데이터 업데이트: {update_time} (한국 시간)")
-            
-            data = st.session_state.last_successful_book_data
-        
-        if data:
-            # 표시할 순위 범위 선택
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                display_range = st.selectbox(
-                    "표시할 순위 범위",
-                    ["TOP 10", "TOP 20", "TOP 50", "TOP 100"],
-                    index=0
-                )
-            
-            # 선택된 범위에 따라 데이터 필터링
-            range_map = {f"TOP {v.value}": v.value for v in ChartRange}
-            display_count = range_map[display_range]
-            filtered_data = data[:display_count]
-            
-            # BookData를 딕셔너리로 변환
-            book_dicts = [
-                {"rank": book.rank, "title": book.title, "author": book.author, "publisher": book.publisher}
-                for book in filtered_data
-            ]
-            df = pd.DataFrame(book_dicts)
-            
-            if not df.empty:
-                # 데이터 테이블 표시
-                st.subheader(f"📋 {display_range} 베스트셀러")
-                st.dataframe(df, use_container_width=True, hide_index=True)
-                
-                # 차트 시각화
-                st.subheader("📊 차트 시각화")
-                fig = px.bar(df, x="title", y="rank", 
-                            title=f"알라딘 베스트셀러 {display_range}",
-                            color="publisher",
-                            height=600)
-                fig.update_layout(
-                    xaxis_tickangle=-45,
-                    showlegend=True
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # 출판사별 통계
-                st.subheader("🏢 출판사별 통계")
-                publisher_stats = df['publisher'].value_counts()
-                fig_pie = px.pie(
-                    values=publisher_stats.values, 
-                    names=publisher_stats.index,
-                    title=f"출판사별 {display_range} 베스트셀러 분포"
-                )
-                st.plotly_chart(fig_pie, use_container_width=True)
-                
-                # 저자별 통계
-                st.subheader("✍️ 저자별 통계")
-                author_stats = df['author'].value_counts()
-                fig_author = px.bar(
-                    x=author_stats.index,
-                    y=author_stats.values,
-                    title=f"저자별 {display_range} 베스트셀러 수",
-                    labels={'x': '저자', 'y': '베스트셀러 수'}
-                )
-                fig_author.update_layout(xaxis_tickangle=-45)
-                st.plotly_chart(fig_author, use_container_width=True)
             else:
                 st.write("데이터를 표시할 수 없습니다.")
 
@@ -908,9 +654,8 @@ def main():
     
     # 메뉴별 처리
     menu_handlers = {
-        "🏠 대시보드 개요": PageHandlers.show_dashboard_overview,
-        "🎵 벅스 일간 차트": PageHandlers.show_bugs_chart,
-        "📚 도서 순위": PageHandlers.show_book_rankings,
+        "🏠 대시보드": PageHandlers.show_dashboard_overview,
+        "🎵 벅스 차트": PageHandlers.show_bugs_chart,
         "🌤️ 날씨 정보": PageHandlers.show_weather_info,
         "📰 뉴스": PageHandlers.show_news,
         "⚙️ 설정": PageHandlers.show_settings
