@@ -645,16 +645,8 @@ class PageHandlers:
             # 뉴스 목록 표시
             for i, news in enumerate(news_data, 1):
                 with st.container():
-                    col1, col2 = st.columns([4, 1])
-                    
-                    with col1:
-                        st.markdown(f"**{i}. {news.title}**")
-                        st.caption(f"출처: {news.source} | 발행: {news.published}")
-                    
-                    with col2:
-                        if st.button(f"링크 {i}", key=f"news_link_{i}"):
-                            st.markdown(f"[뉴스 보기]({news.link})")
-                    
+                    st.markdown(f"**{i}. [{news.title}]({news.link})**")
+                    st.caption(f"출처: {news.source} | 발행: {news.published}")
                     st.markdown("---")
             
             # 뉴스 소스별 통계
