@@ -597,28 +597,6 @@ class PageHandlers:
             for key, timestamp in st.session_state.last_update.items():
                 update_time = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
                 st.write(f"**{key}**: {update_time}")
-        
-        # 최신 뉴스 미리보기
-        st.subheader("📰 최신 뉴스 미리보기")
-        news_data = CacheManager.get_cached_data("news", DataFetcher.get_news)
-        
-        if news_data:
-            # 상위 5개 뉴스만 표시
-            for i, news in enumerate(news_data[:5], 1):
-                st.markdown(f"""
-                <div style="
-                    border-left: 4px solid #3b82f6;
-                    padding-left: 12px;
-                    margin: 8px 0;
-                ">
-                    <p style="margin: 4px 0; font-weight: 500;">{i}. {news.title}</p>
-                    <p style="margin: 2px 0; font-size: 12px; color: #6b7280;">
-                        📰 {news.source} | 📅 {news.published}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("뉴스 데이터를 불러오는 중입니다...")
 
     @staticmethod
     def show_bugs_chart():
