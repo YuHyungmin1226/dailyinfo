@@ -503,6 +503,20 @@ class UIComponents:
             st.session_state.data_cache = {}
         if 'last_update' not in st.session_state:
             st.session_state.last_update = {}
+        
+        # 학교 정보 세션 상태 초기화
+        if 'selected_region' not in st.session_state:
+            st.session_state.selected_region = "서울특별시"
+        if 'school_search' not in st.session_state:
+            st.session_state.school_search = ""
+        if 'selected_school_idx' not in st.session_state:
+            st.session_state.selected_school_idx = None
+        if 'selected_grade' not in st.session_state:
+            st.session_state.selected_grade = "1"
+        if 'selected_class' not in st.session_state:
+            st.session_state.selected_class = "1"
+        if 'selected_week_idx' not in st.session_state:
+            st.session_state.selected_week_idx = 26  # 오늘 주간
     
     @staticmethod
     def create_sidebar() -> str:
@@ -676,12 +690,19 @@ class PageHandlers:
             selected_region = st.selectbox(
                 "지역 선택",
                 list(Constants.REGIONS.keys()),
-                index=0
+                index=list(Constants.REGIONS.keys()).index(st.session_state.selected_region),
+                key="region_selectbox"
             )
+            st.session_state.selected_region = selected_region
         
         # 2. 학교 검색
         with col2:
-            school_search = st.text_input("학교명 검색 (키워드 입력)")
+            school_search = st.text_input(
+                "학교명 검색 (키워드 입력)",
+                value=st.session_state.school_search,
+                key="school_search_input"
+            )
+            st.session_state.school_search = school_search
         
         # 3. 학교 목록 조회
         if selected_region:
@@ -696,11 +717,21 @@ class PageHandlers:
             if schools:
                 # 4. 학교 선택
                 school_names = [f"{school.school_name} ({school.school_level})" for school in schools]
+                
+                # 이전에 선택된 학교가 현재 목록에 있는지 확인
+                default_school_idx = 0
+                if st.session_state.selected_school_idx is not None:
+                    if st.session_state.selected_school_idx < len(school_names):
+                        default_school_idx = st.session_state.selected_school_idx
+                
                 selected_school_idx = st.selectbox(
                     "학교 선택",
                     range(len(school_names)),
-                    format_func=lambda x: school_names[x]
+                    index=default_school_idx,
+                    format_func=lambda x: school_names[x],
+                    key="school_selectbox"
                 )
+                st.session_state.selected_school_idx = selected_school_idx
                 
                 if selected_school_idx is not None:
                     selected_school = schools[selected_school_idx]
@@ -726,10 +757,22 @@ class PageHandlers:
                     col1, col2, col3 = st.columns(3)
                     
                     with col1:
-                        grade = st.selectbox("학년", ["1", "2", "3", "4", "5", "6"], index=0)
+                        grade = st.selectbox(
+                            "학년", 
+                            ["1", "2", "3", "4", "5", "6"], 
+                            index=["1", "2", "3", "4", "5", "6"].index(st.session_state.selected_grade),
+                            key="grade_selectbox"
+                        )
+                        st.session_state.selected_grade = grade
                     
                     with col2:
-                        class_num = st.selectbox("반", [str(i) for i in range(1, 21)], index=0)
+                        class_num = st.selectbox(
+                            "반", 
+                            [str(i) for i in range(1, 21)], 
+                            index=int(st.session_state.selected_class) - 1,
+                            key="class_selectbox"
+                        )
+                        st.session_state.selected_class = class_num
                     
                     with col3:
                         # 주간 기간 선택 (1년 기간, 오늘 기준)
@@ -748,15 +791,14 @@ class PageHandlers:
                                 'label': f"{week_start.strftime('%Y년 %m월 %d일')} ~ {week_end.strftime('%m월 %d일')} ({week_start.strftime('%Y')}년)"
                             })
                         
-                        # 오늘을 포함하는 주를 기본 선택 (인덱스 26)
-                        default_week_idx = 26
-                        
                         selected_week_idx = st.selectbox(
                             "주간 선택",
                             range(len(week_options)),
-                            index=default_week_idx,
-                            format_func=lambda x: week_options[x]['label']
+                            index=st.session_state.selected_week_idx,
+                            format_func=lambda x: week_options[x]['label'],
+                            key="week_selectbox"
                         )
+                        st.session_state.selected_week_idx = selected_week_idx
                     
                     # 선택된 정보가 있으면 즉시 결과 표시
                     if selected_week_idx is not None:
