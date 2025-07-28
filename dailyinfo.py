@@ -725,24 +725,29 @@ class PageHandlers:
                         class_num = st.selectbox("반", [str(i) for i in range(1, 21)], index=0)
                     
                     with col3:
-                        # 주간 기간 선택 (현재 주 기준)
+                        # 주간 기간 선택 (1년 기간, 오늘 기준)
                         from datetime import datetime, timedelta
                         today = datetime.now()
                         monday = today - timedelta(days=today.weekday())
                         
                         week_options = []
-                        for i in range(-2, 3):  # 이전 2주 ~ 다음 2주
+                        # 이전 26주 ~ 다음 26주 (약 1년)
+                        for i in range(-26, 27):
                             week_start = monday + timedelta(weeks=i)
                             week_end = week_start + timedelta(days=4)
                             week_options.append({
                                 'start': week_start.strftime('%Y%m%d'),
                                 'end': week_end.strftime('%Y%m%d'),
-                                'label': f"{week_start.strftime('%m/%d')} ~ {week_end.strftime('%m/%d')}"
+                                'label': f"{week_start.strftime('%Y년 %m월 %d일')} ~ {week_end.strftime('%m월 %d일')} ({week_start.strftime('%Y')}년)"
                             })
+                        
+                        # 오늘을 포함하는 주를 기본 선택 (인덱스 26)
+                        default_week_idx = 26
                         
                         selected_week_idx = st.selectbox(
                             "주간 선택",
                             range(len(week_options)),
+                            index=default_week_idx,
                             format_func=lambda x: week_options[x]['label']
                         )
                     
