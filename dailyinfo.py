@@ -616,23 +616,73 @@ class PageHandlers:
         """도서 순위 페이지"""
         st.header("📚 교보문고 실시간 베스트셀러 TOP 100")
         
+        # 데이터 출처 정보
+        st.info("📡 교보문고 베스트셀러 데이터를 제공합니다.")
+        
         data = CacheManager.get_cached_data("book_rankings", DataFetcher.get_book_rankings)
         
         if data:
+            # 표시할 순위 범위 선택
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                display_range = st.selectbox(
+                    "표시할 순위 범위",
+                    ["TOP 10", "TOP 20", "TOP 50", "TOP 100"],
+                    index=0
+                )
+            
+            # 선택된 범위에 따라 데이터 필터링
+            range_map = {f"TOP {v.value}": v.value for v in ChartRange}
+            display_count = range_map[display_range]
+            filtered_data = data[:display_count]
+            
             # BookData를 딕셔너리로 변환
             book_dicts = [
                 {"rank": book.rank, "title": book.title, "author": book.author, "publisher": book.publisher}
-                for book in data
+                for book in filtered_data
             ]
             df = pd.DataFrame(book_dicts)
-            st.dataframe(df, use_container_width=True, hide_index=True)
             
-            # 출판사별 통계
-            publisher_stats = df['publisher'].value_counts()
-            fig = px.pie(values=publisher_stats.values, 
-                        names=publisher_stats.index,
-                        title="출판사별 베스트셀러 분포")
-            st.plotly_chart(fig, use_container_width=True)
+            if not df.empty:
+                # 데이터 테이블 표시
+                st.subheader(f"📋 {display_range} 베스트셀러")
+                st.dataframe(df, use_container_width=True, hide_index=True)
+                
+                # 차트 시각화
+                st.subheader("📊 차트 시각화")
+                fig = px.bar(df, x="title", y="rank", 
+                            title=f"교보문고 베스트셀러 {display_range}",
+                            color="publisher",
+                            height=600)
+                fig.update_layout(
+                    xaxis_tickangle=-45,
+                    showlegend=True
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # 출판사별 통계
+                st.subheader("🏢 출판사별 통계")
+                publisher_stats = df['publisher'].value_counts()
+                fig_pie = px.pie(
+                    values=publisher_stats.values, 
+                    names=publisher_stats.index,
+                    title=f"출판사별 {display_range} 베스트셀러 분포"
+                )
+                st.plotly_chart(fig_pie, use_container_width=True)
+                
+                # 저자별 통계
+                st.subheader("✍️ 저자별 통계")
+                author_stats = df['author'].value_counts()
+                fig_author = px.bar(
+                    x=author_stats.index,
+                    y=author_stats.values,
+                    title=f"저자별 {display_range} 베스트셀러 수",
+                    labels={'x': '저자', 'y': '베스트셀러 수'}
+                )
+                fig_author.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig_author, use_container_width=True)
+            else:
+                st.write("데이터를 표시할 수 없습니다.")
 
     @staticmethod
     def show_weather_info():
