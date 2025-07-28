@@ -851,7 +851,7 @@ class PageHandlers:
                                         all_timetables.append(item)
                             
                             if all_timetables:
-                                # 주간 시간표 형태로 구성 (행: 교시, 열: 날짜)
+                                # 날짜별로 그룹화하여 표시 (급식 정보와 동일한 형태)
                                 from collections import defaultdict
                                 
                                 # 날짜별로 시간표 데이터 그룹화
@@ -859,56 +859,46 @@ class PageHandlers:
                                 for item in all_timetables:
                                     date_timetables[item.date].append(item)
                                 
-                                # 교시별로 정렬된 모든 교시 수집
-                                all_periods = set()
-                                for items in date_timetables.values():
-                                    for item in items:
-                                        all_periods.add(item.period)
-                                all_periods = sorted(list(all_periods))
-                                
-                                if all_periods:
-                                    # 날짜별로 정렬
-                                    sorted_dates = sorted(date_timetables.keys())
+                                # 날짜별로 정렬하여 표시
+                                sorted_dates = sorted(date_timetables.keys())
+                                for date in sorted_dates:
+                                    date_obj = datetime.strptime(date, '%Y%m%d')
+                                    day_name = date_obj.strftime('%A')
                                     
-                                    # 주간 시간표 데이터 구성
-                                    weekly_data = []
-                                    for period in all_periods:
-                                        row_data = {"교시": f"{period}교시"}
-                                        
-                                        for date in sorted_dates:
-                                            date_obj = datetime.strptime(date, '%Y%m%d')
-                                            day_label = f"{date_obj.strftime('%m/%d')}\n({date_obj.strftime('%A')[:3]})"
-                                            
-                                            # 해당 날짜와 교시의 과목 찾기
-                                            subject_info = ""
-                                            for item in date_timetables[date]:
-                                                if item.period == period:
-                                                    subject_info = f"{item.subject}"
-                                                    if item.teacher:
-                                                        subject_info += f"\n({item.teacher})"
-                                                    if item.classroom:
-                                                        subject_info += f"\n{item.classroom}"
-                                                    break
-                                            
-                                            row_data[day_label] = subject_info if subject_info else "-"
-                                        
-                                        weekly_data.append(row_data)
+                                    st.markdown(f"### 📅 {date_obj.strftime('%Y년 %m월 %d일')} ({day_name})")
                                     
-                                    # 주간 시간표 표시
-                                    st.markdown("### 📅 주간 시간표")
+                                    # 해당 날짜의 시간표 데이터
+                                    timetable_items = date_timetables[date]
+                                    timetable_items.sort(key=lambda x: x.period)
                                     
-                                    df = pd.DataFrame(weekly_data)
-                                    st.dataframe(
-                                        df,
-                                        use_container_width=True,
-                                        hide_index=True,
-                                        column_config={
-                                            "교시": st.column_config.TextColumn("교시", width="medium"),
-                                            **{col: st.column_config.TextColumn(col, width="medium") for col in df.columns if col != "교시"}
-                                        }
-                                    )
-                                else:
-                                    st.info("시간표 정보가 없습니다.")
+                                    # 테이블 데이터 준비
+                                    table_data = []
+                                    for item in timetable_items:
+                                        table_data.append({
+                                            "교시": f"{item.period}교시",
+                                            "과목": item.subject,
+                                            "담당교사": item.teacher if item.teacher else "-",
+                                            "교실": item.classroom if item.classroom else "-"
+                                        })
+                                    
+                                    # Streamlit 테이블로 표시
+                                    if table_data:
+                                        df = pd.DataFrame(table_data)
+                                        st.dataframe(
+                                            df,
+                                            use_container_width=True,
+                                            hide_index=True,
+                                            column_config={
+                                                "교시": st.column_config.TextColumn("교시", width="medium"),
+                                                "과목": st.column_config.TextColumn("과목", width="large"),
+                                                "담당교사": st.column_config.TextColumn("담당교사", width="medium"),
+                                                "교실": st.column_config.TextColumn("교실", width="medium")
+                                            }
+                                        )
+                                    else:
+                                        st.info("해당 날짜의 시간표 정보가 없습니다.")
+                                    
+                                    st.markdown("---")
                             else:
                                 st.warning("📚 해당 주의 시간표 정보가 없습니다.")
                                 st.info("💡 방학, 주말, 공휴일에는 시간표 정보가 제공되지 않습니다.")
