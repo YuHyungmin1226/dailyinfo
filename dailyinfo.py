@@ -356,15 +356,18 @@ class DataProcessor:
         with col3:
             st.metric("💨 풍속", f"{weather_data.wind_speed:.1f} m/s")
         
-        # 날씨 설명
-        st.info(f"📝 날씨 상태: {weather_data.description}")
+        # 날씨 설명과 바람 방향을 함께 표시
+        col1, col2 = st.columns(2)
         
-        # 바람 방향
-        directions = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"]
-        direction_index = int((weather_data.wind_direction + 22.5) / 45) % 8
-        wind_direction = directions[direction_index]
+        with col1:
+            st.info(f"📝 날씨 상태: {weather_data.description}")
         
-        st.write(f"🧭 바람 방향: {wind_direction} ({weather_data.wind_direction}°)")
+        with col2:
+            # 바람 방향
+            directions = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"]
+            direction_index = int((weather_data.wind_direction + 22.5) / 45) % 8
+            wind_direction = directions[direction_index]
+            st.info(f"🧭 바람 방향: {wind_direction} ({weather_data.wind_direction}°)")
 
 class CacheManager:
     """캐시 관리 클래스"""
