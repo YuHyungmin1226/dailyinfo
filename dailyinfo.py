@@ -819,7 +819,7 @@ class PageHandlers:
                         st.markdown("---")
                         
                         # 결과를 탭으로 구분하여 표시
-                        tab1, tab2, tab3, tab4 = st.tabs(["🍽️ 급식 정보", "📚 시간표 정보", "👨‍🏫 내 수업 정보", "📅 학사일정"])
+                        tab1, tab2, tab3, tab4 = st.tabs(["🍽️ 급식 정보", "📚 시간표 정보", "📅 학사일정", "👨‍🏫 내 수업 정보"])
                         
                         with tab1:
                             st.subheader("🍽️ 급식 정보")
@@ -948,67 +948,147 @@ class PageHandlers:
                                 st.info("💡 방학, 주말, 공휴일에는 시간표 정보가 제공되지 않습니다.")
                         
                         with tab3:
-                            st.subheader("📅 학사일정")
+                            st.subheader("👨‍🏫 내 수업 정보")
                             
-                            # 주간 전체 학사일정 정보 조회
-                            all_schedules = []
+                            # 수업 검색 조건 입력
+                            st.markdown("### 📝 수업 검색 조건")
+                            st.info("💡 과목명, 학년, 반을 입력하면 해당 조건에 맞는 시간표 정보를 검색하여 주간 단위로 표시합니다.")
                             
-                            # 주의 시작일부터 5일간 조회 (월~금)
-                            start_date = datetime.strptime(selected_week['start'], '%Y%m%d')
-                            end_date = start_date + timedelta(days=4)
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                search_subject = st.text_input("과목명", key="search_subject_input", placeholder="예: 수학, 국어")
+                            with col2:
+                                search_grade = st.selectbox("학년", ["전체", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"], key="search_grade_input")
+                            with col3:
+                                search_class = st.selectbox("반", ["전체", "1반", "2반", "3반", "4반", "5반", "6반", "7반", "8반", "9반", "10반"], key="search_class_input")
                             
-                            # 학사일정은 주간 단위로 조회
-                            from_date_str = start_date.strftime('%Y%m%d')
-                            to_date_str = end_date.strftime('%Y%m%d')
+                            # 검색 버튼
+                            search_clicked = st.button("🔍 수업 검색", key="search_classes_btn", type="primary")
                             
-                            daily_schedules = DataFetcher.get_school_schedule(
-                                selected_school.school_code, 
-                                from_date_str, 
-                                to_date_str,
-                                region_code
-                            )
+                            st.markdown("---")
                             
-                            if daily_schedules:
-                                # 날짜별로 그룹화하여 표시
-                                from collections import defaultdict
+                            # 검색 결과 표시
+                            if search_clicked and selected_school:
+                                st.markdown("### 📊 내 수업 시간표")
                                 
-                                # 날짜별로 학사일정 데이터 그룹화
-                                date_schedules = defaultdict(list)
-                                for item in daily_schedules:
-                                    date_schedules[item.date].append(item)
+                                # 선택된 주의 날짜 범위 계산
+                                selected_week_idx = st.session_state.get('selected_week_idx', 0)
+                                today = datetime.now(Constants.KOREA_TZ)
+                                start_of_week = today - timedelta(days=today.weekday()) + timedelta(weeks=selected_week_idx)
                                 
-                                # 날짜별로 정렬하여 표시
-                                sorted_dates = sorted(date_schedules.keys())
-                                for date in sorted_dates:
-                                    date_obj = datetime.strptime(date, '%Y%m%d')
-                                    day_name = date_obj.strftime('%A')
+                                # 해당 주의 모든 날짜 (월~금)
+                                week_dates = []
+                                for i in range(5):  # 월~금
+                                    date = start_of_week + timedelta(days=i)
+                                    week_dates.append(date.strftime('%Y%m%d'))
+                                
+                                # 각 날짜별로 시간표 데이터 가져오기
+                                all_timetable_data = []
+                                for date in week_dates:
+                                    # 학년과 반 필터링
+                                    grade_filter = search_grade if search_grade != "전체" else "1학년"  # 기본값
+                                    class_filter = search_class if search_class != "전체" else "1반"   # 기본값
                                     
-                                    st.markdown(f"### 📅 {date_obj.strftime('%Y년 %m월 %d일')} ({day_name})")
+                                    # 시간표 데이터 가져오기
+                                    timetable_data = DataFetcher.get_timetable(
+                                        selected_school.school_code,
+                                        grade_filter,
+                                        class_filter,
+                                        date,
+                                        region_code,
+                                        selected_school.school_level
+                                    )
                                     
-                                    # 해당 날짜의 학사일정 데이터
-                                    schedule_items = date_schedules[date]
+                                    # 과목명 필터링
+                                    if search_subject:
+                                        filtered_data = [item for item in timetable_data if search_subject in item.subject]
+                                    else:
+                                        filtered_data = timetable_data
                                     
-                                    for item in schedule_items:
-                                        with st.container():
-                                            st.markdown(f"""
-                                            <div style="
-                                                border: 1px solid #e0e0e0;
-                                                border-radius: 8px;
-                                                padding: 16px;
-                                                margin: 8px 0;
-                                                background-color: #f0f8ff;
-                                                border-left: 4px solid #1e90ff;
-                                            ">
-                                                <h4 style="margin: 0 0 8px 0; color: #1f2937;">📅 {item.event_name}</h4>
-                                                <p style="margin: 4px 0; color: #374151;">{item.event_type}</p>
-                                                {f'<p style="margin: 4px 0; color: #6b7280; font-size: 14px;">📋 전체학년 이벤트: {"예" if item.event_content == "Y" else "아니오"}</p>' if item.event_content else ''}
-                                            </div>
-                                            """, unsafe_allow_html=True)
+                                    all_timetable_data.extend(filtered_data)
+                                
+                                if all_timetable_data:
+                                    # 요일별 교시별 수업 매핑
+                                    schedule_data = {}
+                                    for item in all_timetable_data:
+                                        # 날짜를 요일로 변환
+                                        date_obj = datetime.strptime(item.date, '%Y%m%d')
+                                        day_name = date_obj.strftime('%A')
+                                        day_korean = {
+                                            'Monday': '월요일',
+                                            'Tuesday': '화요일', 
+                                            'Wednesday': '수요일',
+                                            'Thursday': '목요일',
+                                            'Friday': '금요일'
+                                        }.get(day_name, day_name)
+                                        
+                                        if day_korean not in schedule_data:
+                                            schedule_data[day_korean] = {}
+                                        schedule_data[day_korean][item.period] = item
                                     
+                                    # 시간표 테이블 생성
+                                    days = ["월요일", "화요일", "수요일", "목요일", "금요일"]
+                                    periods = list(range(1, 10))  # 1~9교시
+                                    
+                                    # 테이블 헤더
+                                    header_cols = st.columns([1] + [1] * len(days))
+                                    with header_cols[0]:
+                                        st.markdown("**교시**")
+                                    for i, day in enumerate(days):
+                                        with header_cols[i + 1]:
+                                            st.markdown(f"**{day}**")
+                                    
+                                    # 각 교시별 행
+                                    for period in periods:
+                                        cols = st.columns([1] + [1] * len(days))
+                                        with cols[0]:
+                                            st.markdown(f"**{period}교시**")
+                                        
+                                        for i, day in enumerate(days):
+                                            with cols[i + 1]:
+                                                if day in schedule_data and period in schedule_data[day]:
+                                                    item = schedule_data[day][period]
+                                                    st.markdown(f"""
+                                                    <div style="
+                                                        border: 1px solid #28a745;
+                                                        border-radius: 4px;
+                                                        padding: 8px;
+                                                        margin: 2px 0;
+                                                        background-color: #d4edda;
+                                                        text-align: center;
+                                                        font-size: 12px;
+                                                    ">
+                                                        <strong>{item.subject}</strong><br>
+                                                        {item.teacher}<br>
+                                                        {item.classroom}
+                                                    </div>
+                                                    """, unsafe_allow_html=True)
+                                                else:
+                                                    st.markdown("")
+                                    
+                                    # 검색 조건 표시
                                     st.markdown("---")
+                                    st.markdown("### 📋 검색 조건")
+                                    search_conditions = []
+                                    if search_subject:
+                                        search_conditions.append(f"과목: {search_subject}")
+                                    if search_grade != "전체":
+                                        search_conditions.append(f"학년: {search_grade}")
+                                    if search_class != "전체":
+                                        search_conditions.append(f"반: {search_class}")
+                                    
+                                    if search_conditions:
+                                        st.info(f"🔍 검색 조건: {' | '.join(search_conditions)}")
+                                    else:
+                                        st.info("🔍 검색 조건: 전체")
+                                        
+                                else:
+                                    st.warning("📚 해당 조건에 맞는 수업이 없습니다.")
+                                    st.info("💡 다른 조건으로 검색해보세요.")
+                            elif search_clicked:
+                                st.warning("🏫 학교를 먼저 선택해주세요.")
                             else:
-                                st.warning("📅 해당 주의 학사일정이 없습니다.")
-                                st.info("💡 방학, 주말, 공휴일에는 학사일정이 제공되지 않거나 등록된 일정이 없습니다.")
+                                st.info("🔍 위에서 검색 조건을 입력하고 '수업 검색' 버튼을 클릭하세요.")
                         
                         with tab4:
                             st.subheader("👨‍🏫 내 수업 정보")
@@ -1152,6 +1232,69 @@ class PageHandlers:
                                 st.warning("🏫 학교를 먼저 선택해주세요.")
                             else:
                                 st.info("🔍 위에서 검색 조건을 입력하고 '수업 검색' 버튼을 클릭하세요.")
+                        
+                        with tab4:
+                            st.subheader("📅 학사일정")
+                            
+                            # 주간 전체 학사일정 정보 조회
+                            all_schedules = []
+                            
+                            # 주의 시작일부터 5일간 조회 (월~금)
+                            start_date = datetime.strptime(selected_week['start'], '%Y%m%d')
+                            end_date = start_date + timedelta(days=4)
+                            
+                            # 학사일정은 주간 단위로 조회
+                            from_date_str = start_date.strftime('%Y%m%d')
+                            to_date_str = end_date.strftime('%Y%m%d')
+                            
+                            daily_schedules = DataFetcher.get_school_schedule(
+                                selected_school.school_code, 
+                                from_date_str, 
+                                to_date_str,
+                                region_code
+                            )
+                            
+                            if daily_schedules:
+                                # 날짜별로 그룹화하여 표시
+                                from collections import defaultdict
+                                
+                                # 날짜별로 학사일정 데이터 그룹화
+                                date_schedules = defaultdict(list)
+                                for item in daily_schedules:
+                                    date_schedules[item.date].append(item)
+                                
+                                # 날짜별로 정렬하여 표시
+                                sorted_dates = sorted(date_schedules.keys())
+                                for date in sorted_dates:
+                                    date_obj = datetime.strptime(date, '%Y%m%d')
+                                    day_name = date_obj.strftime('%A')
+                                    
+                                    st.markdown(f"### 📅 {date_obj.strftime('%Y년 %m월 %d일')} ({day_name})")
+                                    
+                                    # 해당 날짜의 학사일정 데이터
+                                    schedule_items = date_schedules[date]
+                                    
+                                    for item in schedule_items:
+                                        with st.container():
+                                            st.markdown(f"""
+                                            <div style="
+                                                border: 1px solid #e0e0e0;
+                                                border-radius: 8px;
+                                                padding: 16px;
+                                                margin: 8px 0;
+                                                background-color: #f0f8ff;
+                                                border-left: 4px solid #1e90ff;
+                                            ">
+                                                <h4 style="margin: 0 0 8px 0; color: #1f2937;">📅 {item.event_name}</h4>
+                                                <p style="margin: 4px 0; color: #374151;">{item.event_type}</p>
+                                                {f'<p style="margin: 4px 0; color: #6b7280; font-size: 14px;">📋 전체학년 이벤트: {"예" if item.event_content == "Y" else "아니오"}</p>' if item.event_content else ''}
+                                            </div>
+                                            """, unsafe_allow_html=True)
+                                    
+                                    st.markdown("---")
+                            else:
+                                st.warning("📅 해당 주의 학사일정이 없습니다.")
+                                st.info("💡 방학, 주말, 공휴일에는 학사일정이 제공되지 않거나 등록된 일정이 없습니다.")
             else:
                 st.warning("해당 지역에서 학교를 찾을 수 없습니다.")
         else:
