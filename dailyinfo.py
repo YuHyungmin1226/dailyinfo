@@ -1073,9 +1073,9 @@ class PageHandlers:
                                                 selected_school.school_level
                                             )
                                             
-                                            # 과목명 필터링
+                                            # 과목명 필터링 (대소문자 구분 없이, 부분 문자열 매칭)
                                             if search_subject:
-                                                filtered_data = [item for item in timetable_data if search_subject in item.subject]
+                                                filtered_data = [item for item in timetable_data if search_subject.lower() in item.subject.lower()]
                                             else:
                                                 filtered_data = timetable_data
                                             
@@ -1089,11 +1089,16 @@ class PageHandlers:
                                         if key not in unique_data:
                                             unique_data[key] = item
                                     
-                                    # 요일별 교시별 수업 매핑
-                                    schedule_data = {}
+                                    # 날짜별로 데이터 그룹화
+                                    date_groups = {}
                                     for item in unique_data.values():
-                                        # 날짜를 요일로 변환
-                                        date_obj = datetime.strptime(item.date, '%Y%m%d')
+                                        if item.date not in date_groups:
+                                            date_groups[item.date] = []
+                                        date_groups[item.date].append(item)
+                                    
+                                    # 날짜별로 정렬하여 표시
+                                    for date in sorted(date_groups.keys()):
+                                        date_obj = datetime.strptime(date, '%Y%m%d')
                                         day_name = date_obj.strftime('%A')
                                         day_korean = {
                                             'Monday': '월요일',
@@ -1103,49 +1108,50 @@ class PageHandlers:
                                             'Friday': '금요일'
                                         }.get(day_name, day_name)
                                         
-                                        if day_korean not in schedule_data:
-                                            schedule_data[day_korean] = {}
-                                        schedule_data[day_korean][item.period] = item
-                                    
-                                    # 시간표 테이블 생성
-                                    days = ["월요일", "화요일", "수요일", "목요일", "금요일"]
-                                    periods = list(range(1, 10))  # 1~9교시
-                                    
-                                    # 테이블 헤더
-                                    header_cols = st.columns([1] + [1] * len(days))
-                                    with header_cols[0]:
-                                        st.markdown("**교시**")
-                                    for i, day in enumerate(days):
-                                        with header_cols[i + 1]:
-                                            st.markdown(f"**{day}**")
-                                    
-                                    # 각 교시별 행
-                                    for period in periods:
-                                        cols = st.columns([1] + [1] * len(days))
-                                        with cols[0]:
-                                            st.markdown(f"**{period}교시**")
+                                        # 해당 날짜의 수업들을 교시별로 정렬
+                                        day_classes = sorted(date_groups[date], key=lambda x: x.period)
                                         
-                                        for i, day in enumerate(days):
-                                            with cols[i + 1]:
-                                                if day in schedule_data and period in schedule_data[day]:
-                                                    item = schedule_data[day][period]
-                                                    st.markdown(f"""
-                                                    <div style="
-                                                        border: 1px solid #28a745;
-                                                        border-radius: 4px;
-                                                        padding: 8px;
-                                                        margin: 2px 0;
-                                                        background-color: #d4edda;
-                                                        text-align: center;
-                                                        font-size: 12px;
-                                                    ">
-                                                        <strong>{item.subject}</strong><br>
-                                                        {item.teacher}<br>
-                                                        {item.classroom}
+                                        st.markdown(f"""
+                                        <div style="
+                                            border: 1px solid #e5e7eb;
+                                            border-radius: 8px;
+                                            padding: 16px;
+                                            margin: 16px 0;
+                                            background-color: #f9fafb;
+                                        ">
+                                            <h3 style="margin: 0 0 12px 0; color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 8px;">
+                                                📅 {date_obj.strftime('%Y년 %m월 %d일')} ({day_korean})
+                                            </h3>
+                                        """, unsafe_allow_html=True)
+                                        
+                                        if day_classes:
+                                            for item in day_classes:
+                                                st.markdown(f"""
+                                                <div style="
+                                                    border: 1px solid #28a745;
+                                                    border-radius: 6px;
+                                                    padding: 12px;
+                                                    margin: 8px 0;
+                                                    background-color: #d4edda;
+                                                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                                                ">
+                                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                                        <span style="background-color: #28a745; color: white; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px;">
+                                                            {item.period}교시
+                                                        </span>
+                                                        <span style="color: #6b7280; font-size: 14px;">
+                                                            {item.teacher} | {item.classroom}
+                                                        </span>
                                                     </div>
-                                                    """, unsafe_allow_html=True)
-                                                else:
-                                                    st.markdown("")
+                                                    <h4 style="margin: 0; color: #1f2937; font-size: 16px;">
+                                                        📚 {item.subject}
+                                                    </h4>
+                                                </div>
+                                                """, unsafe_allow_html=True)
+                                        else:
+                                            st.info("📚 해당 날짜에 수업이 없습니다.")
+                                        
+                                        st.markdown("</div>", unsafe_allow_html=True)
                                     
                                     # 검색 조건 표시
                                     st.markdown("---")
@@ -1162,6 +1168,16 @@ class PageHandlers:
                                         st.info(f"🔍 검색 조건: {' | '.join(search_conditions)}")
                                     else:
                                         st.info("🔍 검색 조건: 전체")
+                                    
+                                    # 디버깅 정보 표시
+                                    st.markdown("### 🔍 검색 결과 통계")
+                                    st.info(f"📊 총 {len(all_timetable_data)}개의 수업 데이터를 찾았습니다.")
+                                    st.info(f"📊 중복 제거 후 {len(unique_data)}개의 고유 수업이 있습니다.")
+                                    
+                                    # 검색된 과목 목록 표시
+                                    if unique_data:
+                                        subjects_found = list(set([item.subject for item in unique_data.values()]))
+                                        st.info(f"📚 검색된 과목: {', '.join(subjects_found)}")
                                         
                                 else:
                                     st.warning("📚 해당 조건에 맞는 수업이 없습니다.")
