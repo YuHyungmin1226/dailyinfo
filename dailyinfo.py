@@ -1034,15 +1034,18 @@ class PageHandlers:
                             if search_clicked and selected_school:
                                 st.markdown("### 📊 내 수업 시간표")
                                 
-                                # 선택된 주의 날짜 범위 계산
-                                selected_week_idx = st.session_state.get('selected_week_idx', 0)
+                                # 선택된 주의 날짜 범위 계산 (다른 탭과 동일한 방식 사용)
+                                selected_week_idx = st.session_state.get('selected_week_idx', 26)  # 기본값을 26으로 설정
+                                
+                                # week_options와 동일한 방식으로 주간 계산
                                 today = datetime.now(Constants.KOREA_TZ)
-                                start_of_week = today - timedelta(days=today.weekday()) + timedelta(weeks=selected_week_idx)
+                                monday = today - timedelta(days=today.weekday())
+                                week_start = monday + timedelta(weeks=selected_week_idx - 26)  # 26을 빼서 올바른 주차 계산
                                 
                                 # 해당 주의 모든 날짜 (월~금)
                                 week_dates = []
                                 for i in range(5):  # 월~금
-                                    date = start_of_week + timedelta(days=i)
+                                    date = week_start + timedelta(days=i)
                                     week_dates.append(date.strftime('%Y%m%d'))
                                 
                                 # 데이터 검색 및 재구성 시작 메시지
@@ -1093,6 +1096,9 @@ class PageHandlers:
                                                     # 과목명 필터링 (대소문자 구분 없이, 부분 문자열 매칭)
                                                     if search_subject:
                                                         filtered_data = [item for item in timetable_data if search_subject.lower() in item.subject.lower()]
+                                                        # 디버깅: 필터링 결과 로그
+                                                        if timetable_data and not filtered_data:
+                                                            st.warning(f"⚠️ {date} {grade} {class_num}: '{search_subject}' 과목을 찾을 수 없습니다. (사용 가능한 과목: {', '.join([item.subject for item in timetable_data])})")
                                                     else:
                                                         filtered_data = timetable_data
                                                     
@@ -1203,6 +1209,11 @@ class PageHandlers:
                                     st.info(f"📊 총 {len(all_timetable_data)}개의 수업 데이터를 찾았습니다.")
                                     st.info(f"📊 중복 제거 후 {len(unique_data)}개의 고유 수업이 있습니다.")
                                     
+                                    # 필터링 전 원본 데이터 통계 (디버깅용)
+                                    if all_timetable_data:
+                                        all_subjects = list(set([item.subject for item in all_timetable_data]))
+                                        st.info(f"📚 필터링 전 모든 과목: {', '.join(all_subjects)}")
+                                    
                                     # API 호출 실패 정보 표시
                                     if api_failures:
                                         failed_classes = [f"{class_num} (실패 {count}회)" for class_num, count in api_failures.items() if count >= 3]
@@ -1218,6 +1229,7 @@ class PageHandlers:
                                     st.markdown("### 📋 검색 조건 상세")
                                     st.info(f"🏫 학교: {selected_school.school_name} ({selected_school.school_level})")
                                     st.info(f"📅 검색 주차: {selected_week}")
+                                    st.info(f"📅 검색 날짜들: {', '.join(week_dates)}")
                                     st.info(f"🔍 검색 학년: {', '.join(grades_to_search)}")
                                     st.info(f"🔍 검색 반: {', '.join(classes_to_search)}")
                                         
