@@ -36,6 +36,7 @@ class Constants:
     NEIS_HIS_TIMETABLE = f"{NEIS_BASE_URL}/hisTimetable"  # 고등학교
     NEIS_MIS_TIMETABLE = f"{NEIS_BASE_URL}/misTimetable"  # 중학교
     NEIS_ELS_TIMETABLE = f"{NEIS_BASE_URL}/elsTimetable"  # 초등학교
+    NEIS_SCHOOL_SCHEDULE = f"{NEIS_BASE_URL}/SchoolSchedule"  # 학사일정
     
     # 지역 정보 (교육청 코드)
     REGIONS = {
@@ -135,6 +136,15 @@ class TimetableData:
     subject: str
     teacher: str
     classroom: str
+    day_name: str = ""  # 요일 정보
+
+@dataclass
+class SchoolScheduleData:
+    """학사일정 데이터 클래스"""
+    date: str
+    event_name: str
+    event_type: str
+    event_content: str
     day_name: str = ""  # 요일 정보
 
 @dataclass
@@ -404,6 +414,53 @@ class DataFetcher:
             st.error(f"시간표 정보를 불러올 수 없습니다: {e}")
             return []
 
+    @staticmethod
+    def get_school_schedule(school_code: str, from_date: str, to_date: str, region_code: str = 'B10') -> List[SchoolScheduleData]:
+        """학사일정 정보 조회"""
+        try:
+            params = {
+                'KEY': 'c4ef97602ca54adc9e4cd49648b247f6',  # 테스트용 API 키
+                'Type': 'json',
+                'ATPT_OFCDC_SC_CODE': region_code,  # 선택된 지역의 교육청 코드 사용
+                'SD_SCHUL_CODE': school_code,
+                'AA_FROM_YMD': from_date,  # 시작일
+                'AA_TO_YMD': to_date       # 종료일
+            }
+            
+            response = requests.get(Constants.NEIS_SCHOOL_SCHEDULE, params=params, timeout=Constants.REQUEST_TIMEOUT)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # RESULT 키가 있으면 데이터가 없는 경우
+            if 'RESULT' in data:
+                result = data['RESULT']
+                if result.get('CODE') == 'INFO-200':
+                    return []  # 데이터가 없음
+                elif result.get('CODE') == 'ERROR-300':
+                    st.error("필수 값이 누락되었습니다. 요청인자를 확인해주세요.")
+                    return []
+            
+            if 'SchoolSchedule' not in data:
+                return []
+            
+            schedules = []
+            schedule_list = data['SchoolSchedule'][1]['row']
+            
+            for schedule in schedule_list:
+                schedules.append(SchoolScheduleData(
+                    date=schedule.get('AA_YMD', ''),
+                    event_name=schedule.get('EVENT_NM', ''),
+                    event_type=schedule.get('EVENT_CNTNT', ''),
+                    event_content=schedule.get('ONE_GRADE_EVENT_YN', '')  # 전체 학년 이벤트 여부
+                ))
+            
+            return schedules
+            
+        except Exception as e:
+            st.error(f"학사일정 정보를 불러올 수 없습니다: {e}")
+            return []
+
 class DataProcessor:
     """데이터 처리 및 시각화 클래스"""
     
@@ -537,6 +594,7 @@ class UIComponents:
             st.markdown("---")
             st.markdown("### 📡 데이터 출처")
             st.markdown("- **학교 정보**: NEIS Open API")
+            st.markdown("- **급식/시간표/학사일정**: NEIS Open API")
             st.markdown("- **날씨 정보**: OpenWeatherMap API")
             st.markdown("- **뉴스**: Google 뉴스 RSS")
             
@@ -760,7 +818,7 @@ class PageHandlers:
                         st.markdown("---")
                         
                         # 결과를 탭으로 구분하여 표시
-                        tab1, tab2 = st.tabs(["🍽️ 급식 정보", "📚 시간표 정보"])
+                        tab1, tab2, tab3 = st.tabs(["🍽️ 급식 정보", "📚 시간표 정보", "📅 학사일정"])
                         
                         with tab1:
                             st.subheader("🍽️ 급식 정보")
@@ -887,6 +945,69 @@ class PageHandlers:
                             else:
                                 st.warning("📚 해당 주의 시간표 정보가 없습니다.")
                                 st.info("💡 방학, 주말, 공휴일에는 시간표 정보가 제공되지 않습니다.")
+                        
+                        with tab3:
+                            st.subheader("📅 학사일정")
+                            
+                            # 주간 전체 학사일정 정보 조회
+                            all_schedules = []
+                            
+                            # 주의 시작일부터 5일간 조회 (월~금)
+                            start_date = datetime.strptime(selected_week['start'], '%Y%m%d')
+                            end_date = start_date + timedelta(days=4)
+                            
+                            # 학사일정은 주간 단위로 조회
+                            from_date_str = start_date.strftime('%Y%m%d')
+                            to_date_str = end_date.strftime('%Y%m%d')
+                            
+                            daily_schedules = DataFetcher.get_school_schedule(
+                                selected_school.school_code, 
+                                from_date_str, 
+                                to_date_str,
+                                region_code
+                            )
+                            
+                            if daily_schedules:
+                                # 날짜별로 그룹화하여 표시
+                                from collections import defaultdict
+                                
+                                # 날짜별로 학사일정 데이터 그룹화
+                                date_schedules = defaultdict(list)
+                                for item in daily_schedules:
+                                    date_schedules[item.date].append(item)
+                                
+                                # 날짜별로 정렬하여 표시
+                                sorted_dates = sorted(date_schedules.keys())
+                                for date in sorted_dates:
+                                    date_obj = datetime.strptime(date, '%Y%m%d')
+                                    day_name = date_obj.strftime('%A')
+                                    
+                                    st.markdown(f"### 📅 {date_obj.strftime('%Y년 %m월 %d일')} ({day_name})")
+                                    
+                                    # 해당 날짜의 학사일정 데이터
+                                    schedule_items = date_schedules[date]
+                                    
+                                    for item in schedule_items:
+                                        with st.container():
+                                            st.markdown(f"""
+                                            <div style="
+                                                border: 1px solid #e0e0e0;
+                                                border-radius: 8px;
+                                                padding: 16px;
+                                                margin: 8px 0;
+                                                background-color: #f0f8ff;
+                                                border-left: 4px solid #1e90ff;
+                                            ">
+                                                <h4 style="margin: 0 0 8px 0; color: #1f2937;">📅 {item.event_name}</h4>
+                                                <p style="margin: 4px 0; color: #374151;">{item.event_type}</p>
+                                                {f'<p style="margin: 4px 0; color: #6b7280; font-size: 14px;">📋 전체학년 이벤트: {"예" if item.event_content == "Y" else "아니오"}</p>' if item.event_content else ''}
+                                            </div>
+                                            """, unsafe_allow_html=True)
+                                    
+                                    st.markdown("---")
+                            else:
+                                st.warning("📅 해당 주의 학사일정이 없습니다.")
+                                st.info("💡 방학, 주말, 공휴일에는 학사일정이 제공되지 않거나 등록된 일정이 없습니다.")
             else:
                 st.warning("해당 지역에서 학교를 찾을 수 없습니다.")
         else:
