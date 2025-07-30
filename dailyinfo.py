@@ -1048,9 +1048,12 @@ class PageHandlers:
                                 # 각 날짜별로 시간표 데이터 가져오기
                                 all_timetable_data = []
                                 
-                                # 검색할 학년과 반 목록 결정
+                                # 검색할 학년과 반 목록 결정 (학교급에 따른 학년 범위 제한)
                                 if search_grade == "전체":
-                                    grades_to_search = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년"]
+                                    if selected_school.school_level in ["중학교", "고등학교"]:
+                                        grades_to_search = ["1학년", "2학년", "3학년"]
+                                    else:  # 초등학교
+                                        grades_to_search = ["1학년", "2학년", "3학년", "4학년", "5학년", "6학년"]
                                 else:
                                     grades_to_search = [search_grade]
                                 
@@ -1059,27 +1062,48 @@ class PageHandlers:
                                 else:
                                     classes_to_search = [search_class]
                                 
+                                # API 호출 실패 추적을 위한 변수
+                                api_failures = {}  # {class_num: failure_count}
+                                
                                 # 모든 조합으로 시간표 데이터 가져오기
                                 for date in week_dates:
                                     for grade in grades_to_search:
                                         for class_num in classes_to_search:
-                                            # 시간표 데이터 가져오기
-                                            timetable_data = DataFetcher.get_timetable(
-                                                selected_school.school_code,
-                                                grade,
-                                                class_num,
-                                                date,
-                                                region_code,
-                                                selected_school.school_level
-                                            )
+                                            # 연속 3회 실패한 반은 건너뛰기
+                                            if class_num in api_failures and api_failures[class_num] >= 3:
+                                                continue
                                             
-                                            # 과목명 필터링 (대소문자 구분 없이, 부분 문자열 매칭)
-                                            if search_subject:
-                                                filtered_data = [item for item in timetable_data if search_subject.lower() in item.subject.lower()]
-                                            else:
-                                                filtered_data = timetable_data
-                                            
-                                            all_timetable_data.extend(filtered_data)
+                                            try:
+                                                # 시간표 데이터 가져오기
+                                                timetable_data = DataFetcher.get_timetable(
+                                                    selected_school.school_code,
+                                                    grade,
+                                                    class_num,
+                                                    date,
+                                                    region_code,
+                                                    selected_school.school_level
+                                                )
+                                                
+                                                # API 호출 성공 시 실패 카운트 초기화
+                                                if class_num in api_failures:
+                                                    api_failures[class_num] = 0
+                                                
+                                                # 과목명 필터링 (대소문자 구분 없이, 부분 문자열 매칭)
+                                                if search_subject:
+                                                    filtered_data = [item for item in timetable_data if search_subject.lower() in item.subject.lower()]
+                                                else:
+                                                    filtered_data = timetable_data
+                                                
+                                                all_timetable_data.extend(filtered_data)
+                                                
+                                            except Exception as e:
+                                                # API 호출 실패 시 카운트 증가
+                                                if class_num not in api_failures:
+                                                    api_failures[class_num] = 0
+                                                api_failures[class_num] += 1
+                                                
+                                                # 실패 로그 (디버깅용)
+                                                st.warning(f"⚠️ {grade} {class_num} 시간표 조회 실패 (실패 횟수: {api_failures[class_num]})")
                                 
                                 if all_timetable_data:
                                     # 중복 제거: 동일한 날짜, 교시, 과목의 데이터는 하나만 유지
@@ -1174,10 +1198,23 @@ class PageHandlers:
                                     st.info(f"📊 총 {len(all_timetable_data)}개의 수업 데이터를 찾았습니다.")
                                     st.info(f"📊 중복 제거 후 {len(unique_data)}개의 고유 수업이 있습니다.")
                                     
+                                    # API 호출 실패 정보 표시
+                                    if api_failures:
+                                        failed_classes = [f"{class_num} (실패 {count}회)" for class_num, count in api_failures.items() if count >= 3]
+                                        if failed_classes:
+                                            st.warning(f"⚠️ 연속 3회 이상 실패한 반: {', '.join(failed_classes)}")
+                                    
                                     # 검색된 과목 목록 표시
                                     if unique_data:
                                         subjects_found = list(set([item.subject for item in unique_data.values()]))
                                         st.info(f"📚 검색된 과목: {', '.join(subjects_found)}")
+                                    
+                                    # 검색 조건 상세 정보
+                                    st.markdown("### 📋 검색 조건 상세")
+                                    st.info(f"🏫 학교: {selected_school.school_name} ({selected_school.school_level})")
+                                    st.info(f"📅 검색 주차: {selected_week}")
+                                    st.info(f"🔍 검색 학년: {', '.join(grades_to_search)}")
+                                    st.info(f"🔍 검색 반: {', '.join(classes_to_search)}")
                                         
                                 else:
                                     st.warning("📚 해당 조건에 맞는 수업이 없습니다.")
