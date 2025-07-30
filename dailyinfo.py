@@ -948,292 +948,6 @@ class PageHandlers:
                                 st.info("💡 방학, 주말, 공휴일에는 시간표 정보가 제공되지 않습니다.")
                         
                         with tab3:
-                            st.subheader("👨‍🏫 내 수업 정보")
-                            
-                            # 수업 검색 조건 입력
-                            st.markdown("### 📝 수업 검색 조건")
-                            st.info("💡 과목명, 학년, 반을 입력하면 해당 조건에 맞는 시간표 정보를 검색하여 주간 단위로 표시합니다.")
-                            
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                search_subject = st.text_input("과목명", key="search_subject_input", placeholder="예: 수학, 국어")
-                            with col2:
-                                search_grade = st.selectbox("학년", ["전체", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"], key="search_grade_input")
-                            with col3:
-                                search_class = st.selectbox("반", ["전체", "1반", "2반", "3반", "4반", "5반", "6반", "7반", "8반", "9반", "10반"], key="search_class_input")
-                            
-                            # 검색 버튼
-                            search_clicked = st.button("🔍 수업 검색", key="search_classes_btn", type="primary")
-                            
-                            st.markdown("---")
-                            
-                            # 검색 결과 표시
-                            if search_clicked and selected_school:
-                                st.markdown("### 📊 내 수업 시간표")
-                                
-                                # 선택된 주의 날짜 범위 계산
-                                selected_week_idx = st.session_state.get('selected_week_idx', 0)
-                                today = datetime.now(Constants.KOREA_TZ)
-                                start_of_week = today - timedelta(days=today.weekday()) + timedelta(weeks=selected_week_idx)
-                                
-                                # 해당 주의 모든 날짜 (월~금)
-                                week_dates = []
-                                for i in range(5):  # 월~금
-                                    date = start_of_week + timedelta(days=i)
-                                    week_dates.append(date.strftime('%Y%m%d'))
-                                
-                                # 각 날짜별로 시간표 데이터 가져오기
-                                all_timetable_data = []
-                                for date in week_dates:
-                                    # 학년과 반 필터링
-                                    grade_filter = search_grade if search_grade != "전체" else "1학년"  # 기본값
-                                    class_filter = search_class if search_class != "전체" else "1반"   # 기본값
-                                    
-                                    # 시간표 데이터 가져오기
-                                    timetable_data = DataFetcher.get_timetable(
-                                        selected_school.school_code,
-                                        grade_filter,
-                                        class_filter,
-                                        date,
-                                        region_code,
-                                        selected_school.school_level
-                                    )
-                                    
-                                    # 과목명 필터링
-                                    if search_subject:
-                                        filtered_data = [item for item in timetable_data if search_subject in item.subject]
-                                    else:
-                                        filtered_data = timetable_data
-                                    
-                                    all_timetable_data.extend(filtered_data)
-                                
-                                if all_timetable_data:
-                                    # 요일별 교시별 수업 매핑
-                                    schedule_data = {}
-                                    for item in all_timetable_data:
-                                        # 날짜를 요일로 변환
-                                        date_obj = datetime.strptime(item.date, '%Y%m%d')
-                                        day_name = date_obj.strftime('%A')
-                                        day_korean = {
-                                            'Monday': '월요일',
-                                            'Tuesday': '화요일', 
-                                            'Wednesday': '수요일',
-                                            'Thursday': '목요일',
-                                            'Friday': '금요일'
-                                        }.get(day_name, day_name)
-                                        
-                                        if day_korean not in schedule_data:
-                                            schedule_data[day_korean] = {}
-                                        schedule_data[day_korean][item.period] = item
-                                    
-                                    # 시간표 테이블 생성
-                                    days = ["월요일", "화요일", "수요일", "목요일", "금요일"]
-                                    periods = list(range(1, 10))  # 1~9교시
-                                    
-                                    # 테이블 헤더
-                                    header_cols = st.columns([1] + [1] * len(days))
-                                    with header_cols[0]:
-                                        st.markdown("**교시**")
-                                    for i, day in enumerate(days):
-                                        with header_cols[i + 1]:
-                                            st.markdown(f"**{day}**")
-                                    
-                                    # 각 교시별 행
-                                    for period in periods:
-                                        cols = st.columns([1] + [1] * len(days))
-                                        with cols[0]:
-                                            st.markdown(f"**{period}교시**")
-                                        
-                                        for i, day in enumerate(days):
-                                            with cols[i + 1]:
-                                                if day in schedule_data and period in schedule_data[day]:
-                                                    item = schedule_data[day][period]
-                                                    st.markdown(f"""
-                                                    <div style="
-                                                        border: 1px solid #28a745;
-                                                        border-radius: 4px;
-                                                        padding: 8px;
-                                                        margin: 2px 0;
-                                                        background-color: #d4edda;
-                                                        text-align: center;
-                                                        font-size: 12px;
-                                                    ">
-                                                        <strong>{item.subject}</strong><br>
-                                                        {item.teacher}<br>
-                                                        {item.classroom}
-                                                    </div>
-                                                    """, unsafe_allow_html=True)
-                                                else:
-                                                    st.markdown("")
-                                    
-                                    # 검색 조건 표시
-                                    st.markdown("---")
-                                    st.markdown("### 📋 검색 조건")
-                                    search_conditions = []
-                                    if search_subject:
-                                        search_conditions.append(f"과목: {search_subject}")
-                                    if search_grade != "전체":
-                                        search_conditions.append(f"학년: {search_grade}")
-                                    if search_class != "전체":
-                                        search_conditions.append(f"반: {search_class}")
-                                    
-                                    if search_conditions:
-                                        st.info(f"🔍 검색 조건: {' | '.join(search_conditions)}")
-                                    else:
-                                        st.info("🔍 검색 조건: 전체")
-                                        
-                                else:
-                                    st.warning("📚 해당 조건에 맞는 수업이 없습니다.")
-                                    st.info("💡 다른 조건으로 검색해보세요.")
-                            elif search_clicked:
-                                st.warning("🏫 학교를 먼저 선택해주세요.")
-                            else:
-                                st.info("🔍 위에서 검색 조건을 입력하고 '수업 검색' 버튼을 클릭하세요.")
-                        
-                        with tab4:
-                            st.subheader("👨‍🏫 내 수업 정보")
-                            
-                            # 수업 검색 조건 입력
-                            st.markdown("### 📝 수업 검색 조건")
-                            st.info("💡 과목명, 학년, 반을 입력하면 해당 조건에 맞는 시간표 정보를 검색하여 주간 단위로 표시합니다.")
-                            
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                search_subject = st.text_input("과목명", key="search_subject_input", placeholder="예: 수학, 국어")
-                            with col2:
-                                search_grade = st.selectbox("학년", ["전체", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"], key="search_grade_input")
-                            with col3:
-                                search_class = st.selectbox("반", ["전체", "1반", "2반", "3반", "4반", "5반", "6반", "7반", "8반", "9반", "10반"], key="search_class_input")
-                            
-                            # 검색 버튼
-                            search_clicked = st.button("🔍 수업 검색", key="search_classes_btn", type="primary")
-                            
-                            st.markdown("---")
-                            
-                            # 검색 결과 표시
-                            if search_clicked and selected_school:
-                                st.markdown("### 📊 내 수업 시간표")
-                                
-                                # 선택된 주의 날짜 범위 계산
-                                selected_week_idx = st.session_state.get('selected_week_idx', 0)
-                                today = datetime.now(Constants.KOREA_TZ)
-                                start_of_week = today - timedelta(days=today.weekday()) + timedelta(weeks=selected_week_idx)
-                                
-                                # 해당 주의 모든 날짜 (월~금)
-                                week_dates = []
-                                for i in range(5):  # 월~금
-                                    date = start_of_week + timedelta(days=i)
-                                    week_dates.append(date.strftime('%Y%m%d'))
-                                
-                                # 각 날짜별로 시간표 데이터 가져오기
-                                all_timetable_data = []
-                                for date in week_dates:
-                                    # 학년과 반 필터링
-                                    grade_filter = search_grade if search_grade != "전체" else "1학년"  # 기본값
-                                    class_filter = search_class if search_class != "전체" else "1반"   # 기본값
-                                    
-                                    # 시간표 데이터 가져오기
-                                    timetable_data = DataFetcher.get_timetable(
-                                        selected_school.school_code,
-                                        grade_filter,
-                                        class_filter,
-                                        date,
-                                        region_code,
-                                        selected_school.school_level
-                                    )
-                                    
-                                    # 과목명 필터링
-                                    if search_subject:
-                                        filtered_data = [item for item in timetable_data if search_subject in item.subject]
-                                    else:
-                                        filtered_data = timetable_data
-                                    
-                                    all_timetable_data.extend(filtered_data)
-                                
-                                if all_timetable_data:
-                                    # 요일별 교시별 수업 매핑
-                                    schedule_data = {}
-                                    for item in all_timetable_data:
-                                        # 날짜를 요일로 변환
-                                        date_obj = datetime.strptime(item.date, '%Y%m%d')
-                                        day_name = date_obj.strftime('%A')
-                                        day_korean = {
-                                            'Monday': '월요일',
-                                            'Tuesday': '화요일', 
-                                            'Wednesday': '수요일',
-                                            'Thursday': '목요일',
-                                            'Friday': '금요일'
-                                        }.get(day_name, day_name)
-                                        
-                                        if day_korean not in schedule_data:
-                                            schedule_data[day_korean] = {}
-                                        schedule_data[day_korean][item.period] = item
-                                    
-                                    # 시간표 테이블 생성
-                                    days = ["월요일", "화요일", "수요일", "목요일", "금요일"]
-                                    periods = list(range(1, 10))  # 1~9교시
-                                    
-                                    # 테이블 헤더
-                                    header_cols = st.columns([1] + [1] * len(days))
-                                    with header_cols[0]:
-                                        st.markdown("**교시**")
-                                    for i, day in enumerate(days):
-                                        with header_cols[i + 1]:
-                                            st.markdown(f"**{day}**")
-                                    
-                                    # 각 교시별 행
-                                    for period in periods:
-                                        cols = st.columns([1] + [1] * len(days))
-                                        with cols[0]:
-                                            st.markdown(f"**{period}교시**")
-                                        
-                                        for i, day in enumerate(days):
-                                            with cols[i + 1]:
-                                                if day in schedule_data and period in schedule_data[day]:
-                                                    item = schedule_data[day][period]
-                                                    st.markdown(f"""
-                                                    <div style="
-                                                        border: 1px solid #28a745;
-                                                        border-radius: 4px;
-                                                        padding: 8px;
-                                                        margin: 2px 0;
-                                                        background-color: #d4edda;
-                                                        text-align: center;
-                                                        font-size: 12px;
-                                                    ">
-                                                        <strong>{item.subject}</strong><br>
-                                                        {item.teacher}<br>
-                                                        {item.classroom}
-                                                    </div>
-                                                    """, unsafe_allow_html=True)
-                                                else:
-                                                    st.markdown("")
-                                    
-                                    # 검색 조건 표시
-                                    st.markdown("---")
-                                    st.markdown("### 📋 검색 조건")
-                                    search_conditions = []
-                                    if search_subject:
-                                        search_conditions.append(f"과목: {search_subject}")
-                                    if search_grade != "전체":
-                                        search_conditions.append(f"학년: {search_grade}")
-                                    if search_class != "전체":
-                                        search_conditions.append(f"반: {search_class}")
-                                    
-                                    if search_conditions:
-                                        st.info(f"🔍 검색 조건: {' | '.join(search_conditions)}")
-                                    else:
-                                        st.info("🔍 검색 조건: 전체")
-                                        
-                                else:
-                                    st.warning("📚 해당 조건에 맞는 수업이 없습니다.")
-                                    st.info("💡 다른 조건으로 검색해보세요.")
-                            elif search_clicked:
-                                st.warning("🏫 학교를 먼저 선택해주세요.")
-                            else:
-                                st.info("🔍 위에서 검색 조건을 입력하고 '수업 검색' 버튼을 클릭하세요.")
-                        
-                        with tab4:
                             st.subheader("📅 학사일정")
                             
                             # 주간 전체 학사일정 정보 조회
@@ -1295,6 +1009,292 @@ class PageHandlers:
                             else:
                                 st.warning("📅 해당 주의 학사일정이 없습니다.")
                                 st.info("💡 방학, 주말, 공휴일에는 학사일정이 제공되지 않거나 등록된 일정이 없습니다.")
+                        
+                        with tab4:
+                            st.subheader("👨‍🏫 내 수업 정보")
+                            
+                            # 수업 검색 조건 입력
+                            st.markdown("### 📝 수업 검색 조건")
+                            st.info("💡 과목명, 학년, 반을 입력하면 해당 조건에 맞는 시간표 정보를 검색하여 주간 단위로 표시합니다.")
+                            
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                search_subject = st.text_input("과목명", key="search_subject_input", placeholder="예: 수학, 국어")
+                            with col2:
+                                search_grade = st.selectbox("학년", ["전체", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"], key="search_grade_input")
+                            with col3:
+                                search_class = st.selectbox("반", ["전체", "1반", "2반", "3반", "4반", "5반", "6반", "7반", "8반", "9반", "10반"], key="search_class_input")
+                            
+                            # 검색 버튼
+                            search_clicked = st.button("🔍 수업 검색", key="search_classes_btn", type="primary")
+                            
+                            st.markdown("---")
+                            
+                            # 검색 결과 표시
+                            if search_clicked and selected_school:
+                                st.markdown("### 📊 내 수업 시간표")
+                                
+                                # 선택된 주의 날짜 범위 계산
+                                selected_week_idx = st.session_state.get('selected_week_idx', 0)
+                                today = datetime.now(Constants.KOREA_TZ)
+                                start_of_week = today - timedelta(days=today.weekday()) + timedelta(weeks=selected_week_idx)
+                                
+                                # 해당 주의 모든 날짜 (월~금)
+                                week_dates = []
+                                for i in range(5):  # 월~금
+                                    date = start_of_week + timedelta(days=i)
+                                    week_dates.append(date.strftime('%Y%m%d'))
+                                
+                                # 각 날짜별로 시간표 데이터 가져오기
+                                all_timetable_data = []
+                                for date in week_dates:
+                                    # 학년과 반 필터링
+                                    grade_filter = search_grade if search_grade != "전체" else "1학년"  # 기본값
+                                    class_filter = search_class if search_class != "전체" else "1반"   # 기본값
+                                    
+                                    # 시간표 데이터 가져오기
+                                    timetable_data = DataFetcher.get_timetable(
+                                        selected_school.school_code,
+                                        grade_filter,
+                                        class_filter,
+                                        date,
+                                        region_code,
+                                        selected_school.school_level
+                                    )
+                                    
+                                    # 과목명 필터링
+                                    if search_subject:
+                                        filtered_data = [item for item in timetable_data if search_subject in item.subject]
+                                    else:
+                                        filtered_data = timetable_data
+                                    
+                                    all_timetable_data.extend(filtered_data)
+                                
+                                if all_timetable_data:
+                                    # 요일별 교시별 수업 매핑
+                                    schedule_data = {}
+                                    for item in all_timetable_data:
+                                        # 날짜를 요일로 변환
+                                        date_obj = datetime.strptime(item.date, '%Y%m%d')
+                                        day_name = date_obj.strftime('%A')
+                                        day_korean = {
+                                            'Monday': '월요일',
+                                            'Tuesday': '화요일', 
+                                            'Wednesday': '수요일',
+                                            'Thursday': '목요일',
+                                            'Friday': '금요일'
+                                        }.get(day_name, day_name)
+                                        
+                                        if day_korean not in schedule_data:
+                                            schedule_data[day_korean] = {}
+                                        schedule_data[day_korean][item.period] = item
+                                    
+                                    # 시간표 테이블 생성
+                                    days = ["월요일", "화요일", "수요일", "목요일", "금요일"]
+                                    periods = list(range(1, 10))  # 1~9교시
+                                    
+                                    # 테이블 헤더
+                                    header_cols = st.columns([1] + [1] * len(days))
+                                    with header_cols[0]:
+                                        st.markdown("**교시**")
+                                    for i, day in enumerate(days):
+                                        with header_cols[i + 1]:
+                                            st.markdown(f"**{day}**")
+                                    
+                                    # 각 교시별 행
+                                    for period in periods:
+                                        cols = st.columns([1] + [1] * len(days))
+                                        with cols[0]:
+                                            st.markdown(f"**{period}교시**")
+                                        
+                                        for i, day in enumerate(days):
+                                            with cols[i + 1]:
+                                                if day in schedule_data and period in schedule_data[day]:
+                                                    item = schedule_data[day][period]
+                                                    st.markdown(f"""
+                                                    <div style="
+                                                        border: 1px solid #28a745;
+                                                        border-radius: 4px;
+                                                        padding: 8px;
+                                                        margin: 2px 0;
+                                                        background-color: #d4edda;
+                                                        text-align: center;
+                                                        font-size: 12px;
+                                                    ">
+                                                        <strong>{item.subject}</strong><br>
+                                                        {item.teacher}<br>
+                                                        {item.classroom}
+                                                    </div>
+                                                    """, unsafe_allow_html=True)
+                                                else:
+                                                    st.markdown("")
+                                    
+                                    # 검색 조건 표시
+                                    st.markdown("---")
+                                    st.markdown("### 📋 검색 조건")
+                                    search_conditions = []
+                                    if search_subject:
+                                        search_conditions.append(f"과목: {search_subject}")
+                                    if search_grade != "전체":
+                                        search_conditions.append(f"학년: {search_grade}")
+                                    if search_class != "전체":
+                                        search_conditions.append(f"반: {search_class}")
+                                    
+                                    if search_conditions:
+                                        st.info(f"🔍 검색 조건: {' | '.join(search_conditions)}")
+                                    else:
+                                        st.info("🔍 검색 조건: 전체")
+                                        
+                                else:
+                                    st.warning("📚 해당 조건에 맞는 수업이 없습니다.")
+                                    st.info("💡 다른 조건으로 검색해보세요.")
+                            elif search_clicked:
+                                st.warning("🏫 학교를 먼저 선택해주세요.")
+                            else:
+                                st.info("🔍 위에서 검색 조건을 입력하고 '수업 검색' 버튼을 클릭하세요.")
+                        
+                        with tab4:
+                            st.subheader("👨‍🏫 내 수업 정보")
+                            
+                            # 수업 검색 조건 입력
+                            st.markdown("### 📝 수업 검색 조건")
+                            st.info("💡 과목명, 학년, 반을 입력하면 해당 조건에 맞는 시간표 정보를 검색하여 주간 단위로 표시합니다.")
+                            
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                search_subject = st.text_input("과목명", key="search_subject_input_tab4", placeholder="예: 수학, 국어")
+                            with col2:
+                                search_grade = st.selectbox("학년", ["전체", "1학년", "2학년", "3학년", "4학년", "5학년", "6학년"], key="search_grade_input_tab4")
+                            with col3:
+                                search_class = st.selectbox("반", ["전체", "1반", "2반", "3반", "4반", "5반", "6반", "7반", "8반", "9반", "10반"], key="search_class_input_tab4")
+                            
+                            # 검색 버튼
+                            search_clicked = st.button("🔍 수업 검색", key="search_classes_btn_tab4", type="primary")
+                            
+                            st.markdown("---")
+                            
+                            # 검색 결과 표시
+                            if search_clicked and selected_school:
+                                st.markdown("### 📊 내 수업 시간표")
+                                
+                                # 선택된 주의 날짜 범위 계산
+                                selected_week_idx = st.session_state.get('selected_week_idx', 0)
+                                today = datetime.now(Constants.KOREA_TZ)
+                                start_of_week = today - timedelta(days=today.weekday()) + timedelta(weeks=selected_week_idx)
+                                
+                                # 해당 주의 모든 날짜 (월~금)
+                                week_dates = []
+                                for i in range(5):  # 월~금
+                                    date = start_of_week + timedelta(days=i)
+                                    week_dates.append(date.strftime('%Y%m%d'))
+                                
+                                # 각 날짜별로 시간표 데이터 가져오기
+                                all_timetable_data = []
+                                for date in week_dates:
+                                    # 학년과 반 필터링
+                                    grade_filter = search_grade if search_grade != "전체" else "1학년"  # 기본값
+                                    class_filter = search_class if search_class != "전체" else "1반"   # 기본값
+                                    
+                                    # 시간표 데이터 가져오기
+                                    timetable_data = DataFetcher.get_timetable(
+                                        selected_school.school_code,
+                                        grade_filter,
+                                        class_filter,
+                                        date,
+                                        region_code,
+                                        selected_school.school_level
+                                    )
+                                    
+                                    # 과목명 필터링
+                                    if search_subject:
+                                        filtered_data = [item for item in timetable_data if search_subject in item.subject]
+                                    else:
+                                        filtered_data = timetable_data
+                                    
+                                    all_timetable_data.extend(filtered_data)
+                                
+                                if all_timetable_data:
+                                    # 요일별 교시별 수업 매핑
+                                    schedule_data = {}
+                                    for item in all_timetable_data:
+                                        # 날짜를 요일로 변환
+                                        date_obj = datetime.strptime(item.date, '%Y%m%d')
+                                        day_name = date_obj.strftime('%A')
+                                        day_korean = {
+                                            'Monday': '월요일',
+                                            'Tuesday': '화요일', 
+                                            'Wednesday': '수요일',
+                                            'Thursday': '목요일',
+                                            'Friday': '금요일'
+                                        }.get(day_name, day_name)
+                                        
+                                        if day_korean not in schedule_data:
+                                            schedule_data[day_korean] = {}
+                                        schedule_data[day_korean][item.period] = item
+                                    
+                                    # 시간표 테이블 생성
+                                    days = ["월요일", "화요일", "수요일", "목요일", "금요일"]
+                                    periods = list(range(1, 10))  # 1~9교시
+                                    
+                                    # 테이블 헤더
+                                    header_cols = st.columns([1] + [1] * len(days))
+                                    with header_cols[0]:
+                                        st.markdown("**교시**")
+                                    for i, day in enumerate(days):
+                                        with header_cols[i + 1]:
+                                            st.markdown(f"**{day}**")
+                                    
+                                    # 각 교시별 행
+                                    for period in periods:
+                                        cols = st.columns([1] + [1] * len(days))
+                                        with cols[0]:
+                                            st.markdown(f"**{period}교시**")
+                                        
+                                        for i, day in enumerate(days):
+                                            with cols[i + 1]:
+                                                if day in schedule_data and period in schedule_data[day]:
+                                                    item = schedule_data[day][period]
+                                                    st.markdown(f"""
+                                                    <div style="
+                                                        border: 1px solid #28a745;
+                                                        border-radius: 4px;
+                                                        padding: 8px;
+                                                        margin: 2px 0;
+                                                        background-color: #d4edda;
+                                                        text-align: center;
+                                                        font-size: 12px;
+                                                    ">
+                                                        <strong>{item.subject}</strong><br>
+                                                        {item.teacher}<br>
+                                                        {item.classroom}
+                                                    </div>
+                                                    """, unsafe_allow_html=True)
+                                                else:
+                                                    st.markdown("")
+                                    
+                                    # 검색 조건 표시
+                                    st.markdown("---")
+                                    st.markdown("### 📋 검색 조건")
+                                    search_conditions = []
+                                    if search_subject:
+                                        search_conditions.append(f"과목: {search_subject}")
+                                    if search_grade != "전체":
+                                        search_conditions.append(f"학년: {search_grade}")
+                                    if search_class != "전체":
+                                        search_conditions.append(f"반: {search_class}")
+                                    
+                                    if search_conditions:
+                                        st.info(f"🔍 검색 조건: {' | '.join(search_conditions)}")
+                                    else:
+                                        st.info("🔍 검색 조건: 전체")
+                                        
+                                else:
+                                    st.warning("📚 해당 조건에 맞는 수업이 없습니다.")
+                                    st.info("💡 다른 조건으로 검색해보세요.")
+                            elif search_clicked:
+                                st.warning("🏫 학교를 먼저 선택해주세요.")
+                            else:
+                                st.info("🔍 위에서 검색 조건을 입력하고 '수업 검색' 버튼을 클릭하세요.")
             else:
                 st.warning("해당 지역에서 학교를 찾을 수 없습니다.")
         else:
